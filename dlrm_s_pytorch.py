@@ -337,6 +337,7 @@ class DLRM_Net(nn.Module):
         else:
             return self.parallel_forward(dense_x, lS_o, lS_i)
 
+    # TODO(Yanzhou): Try hash trick to compress the model
     def sequential_forward(self, dense_x, lS_o, lS_i):
         # process dense features (using bottom mlp), resulting in a row vector
         x = self.apply_mlp(dense_x, self.bot_l)
