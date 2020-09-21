@@ -84,6 +84,9 @@ from torch.nn.parallel.scatter_gather import gather, scatter
 from tricks.qr_embedding_bag import QREmbeddingBag
 # mixed-dimension trick
 from tricks.md_embedding_bag import PrEmbeddingBag, md_solver
+from tricks.hash_embedding_bag import HashEmbeddingBag
+from torchvision import models
+from torchsummary import summary
 
 import sklearn.metrics
 
@@ -173,10 +176,16 @@ class DLRM_Net(nn.Module):
         # approach 2: use Sequential container to wrap all layers
         return torch.nn.Sequential(*layers)
 
+    # TODO(Yanzhou Pan): 
+    #   1. Try hashnet on embedding layer.
+    #   2. Try the LSH trick to create embeddings. Something like smartHashingEmbeddingBag(n, m, mode="sum", sparse=True).
+    #       -> need pre process to make the n smaller
     def create_emb(self, m, ln):
         emb_l = nn.ModuleList()
         for i in range(0, ln.size):
             n = ln[i]
+            # print("Max number of unique cat value", max(ln), ln)
+            
             # construct embedding operator
             if self.qr_flag and n > self.qr_threshold:
                 EE = QREmbeddingBag(n, m, self.qr_collisions,
@@ -190,6 +199,9 @@ class DLRM_Net(nn.Module):
                     low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=(n, _m)
                 ).astype(np.float32)
                 EE.embs.weight.data = torch.tensor(W, requires_grad=True)
+
+            elif self.rand_hash_emb_flag:
+                EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, lens=tuple(ln), mode="sum")
 
             else:
                 EE = nn.EmbeddingBag(n, m, mode="sum", sparse=True)
@@ -229,6 +241,8 @@ class DLRM_Net(nn.Module):
         qr_threshold=200,
         md_flag=False,
         md_threshold=200,
+        rand_hash_emb_flag=False,
+        rand_hash_compression_rate=1.0
     ):
         super(DLRM_Net, self).__init__()
 
@@ -252,13 +266,24 @@ class DLRM_Net(nn.Module):
             # create variables for QR embedding if applicable
             self.qr_flag = qr_flag
             if self.qr_flag:
+                print("+++++++++ Using QR Embedding! +++++++++")
                 self.qr_collisions = qr_collisions
                 self.qr_operation = qr_operation
                 self.qr_threshold = qr_threshold
             # create variables for MD embedding if applicable
             self.md_flag = md_flag
             if self.md_flag:
+                print("+++++++++ Using MD Embedding! +++++++++")
                 self.md_threshold = md_threshold
+            # create variables for hash embedding if applicable
+            self.rand_hash_emb_flag = rand_hash_emb_flag
+            self.rand_hash_compression_rate = rand_hash_compression_rate
+            if self.rand_hash_emb_flag:
+                print("++++++++++ Using Random Hash Embedding! Compression rate is: ", self.rand_hash_compression_rate, "++++++++++")
+            
+            if not self.qr_flag and not self.md_flag and not rand_hash_emb_flag:
+                print("+++++++++ Using Original Embedding! +++++++++")
+            
             # create operators
             if ndevices <= 1:
                 self.emb_l = self.create_emb(m_spa, ln_emb)
@@ -528,6 +553,8 @@ if __name__ == "__main__":
     parser.add_argument("--qr-threshold", type=int, default=200)
     parser.add_argument("--qr-operation", type=str, default="mult")
     parser.add_argument("--qr-collisions", type=int, default=4)
+    parser.add_argument("--rand-hash-emb-flag", action="store_true", default=False)
+    parser.add_argument("--rand-hash-compression-rate", type=float, default=1.0)
     # activations and loss
     parser.add_argument("--activation-function", type=str, default="relu")
     parser.add_argument("--loss-function", type=str, default="mse")  # or bce or wbce
@@ -575,6 +602,7 @@ if __name__ == "__main__":
     parser.add_argument("--debug-mode", action="store_true", default=False)
     parser.add_argument("--enable-profiling", action="store_true", default=False)
     parser.add_argument("--plot-compute-graph", action="store_true", default=False)
+    parser.add_argument("--print-parameters-num", action="store_true", default=True)
     # store/load model
     parser.add_argument("--save-model", type=str, default="")
     parser.add_argument("--load-model", type=str, default="")
@@ -594,6 +622,8 @@ if __name__ == "__main__":
 
     if args.mlperf_logging:
         print('command line args: ', json.dumps(vars(args)))
+
+    print("+++++======++++++======args.rand_hash_emb_flag: ", args.rand_hash_emb_flag, )
 
     ### some basic setup ###
     np.random.seed(args.numpy_rand_seed)
@@ -747,7 +777,7 @@ if __name__ == "__main__":
             + str(m_spa)
             + "x:"
         )
-        print(ln_emb)
+        print("ln_emb: ", ln_emb)
 
         print("data (inputs and targets):")
         for j, (X, lS_o, lS_i, T) in enumerate(train_ld):
@@ -793,7 +823,19 @@ if __name__ == "__main__":
         qr_threshold=args.qr_threshold,
         md_flag=args.md_flag,
         md_threshold=args.md_threshold,
+        rand_hash_emb_flag=args.rand_hash_emb_flag,
+        rand_hash_compression_rate=args.rand_hash_compression_rate
     )
+
+    # print number of parameters
+    def count_parameters(model):
+        return sum(p.numel() for p in model.parameters() if p.requires_grad)
+    if args.print_parameters_num:
+        for j, (X, lS_o, lS_i, T) in enumerate(train_ld):
+            print(summary(dlrm, X, lS_o, lS_i))
+            break
+        print('Total parameters_count:', count_parameters(dlrm))
+
     # test prints
     if args.debug_mode:
         print("initial parameters (weights and bias):")
