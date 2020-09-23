@@ -330,10 +330,10 @@ def collate_wrapper_criteo(list_of_tuples):
     batchSize = X_cat.shape[0]
     featureCnt = X_cat.shape[1]
 
-    lS_i = [X_cat[:, i] for i in range(featureCnt)]
-    lS_o = [torch.tensor(range(batchSize)) for _ in range(featureCnt)]
+    lS_indices = [X_cat[:, i] for i in range(featureCnt)]
+    lS_offset = [torch.tensor(range(batchSize)) for _ in range(featureCnt)]
 
-    return X_int, torch.stack(lS_o), torch.stack(lS_i), T
+    return X_int, torch.stack(lS_offset), torch.stack(lS_indices), T
 
 
 def ensure_dataset_preprocessed(args, d_path):
