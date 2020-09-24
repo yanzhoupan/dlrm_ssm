@@ -61,7 +61,7 @@ import functools
 import time
 import json
 # data generation
-import dlrm_data_pytorch as dp
+import dlrm_data_pytorch as dlrm_data
 
 # numpy
 import numpy as np
@@ -85,8 +85,9 @@ from tricks.qr_embedding_bag import QREmbeddingBag
 # mixed-dimension trick
 from tricks.md_embedding_bag import PrEmbeddingBag, md_solver
 from tricks.hash_embedding_bag import HashEmbeddingBag
-from torchvision import models
-from torchsummary import summary
+#from torchvision import models
+#from torchsummary import summary
+from torch.utils.tensorboard import SummaryWriter
 
 import sklearn.metrics
 
@@ -298,7 +299,7 @@ class DLRM_Net(nn.Module):
         # approach 2: use Sequential container to wrap all layers
         return layers(x)
 
-    def apply_emb(self, lS_o, lS_i, emb_l):
+    def apply_emb(self, lS_offset, lS_indices, emb_l):
         # WARNING: notice that we are processing the batch at once. We implicitly
         # assume that the data is laid out such that:
         # 1. each embedding is indexed with a group of sparse indices,
@@ -307,8 +308,8 @@ class DLRM_Net(nn.Module):
         # 3. for a list of embedding tables there is a list of batched lookups
 
         ly = []
-        for k, sparse_index_group_batch in enumerate(lS_i):
-            sparse_offset_group_batch = lS_o[k]
+        for k, sparse_index_group_batch in enumerate(lS_indices):
+            sparse_offset_group_batch = lS_offset[k]
 
             # embedding lookup
             # We are using EmbeddingBag, which implicitly uses sum operator.
@@ -356,14 +357,14 @@ class DLRM_Net(nn.Module):
 
         return R
 
-    def forward(self, dense_x, lS_o, lS_i):
+    def forward(self, dense_x, lS_offset, lS_indices):
         if self.ndevices <= 1:
-            return self.sequential_forward(dense_x, lS_o, lS_i)
+            return self.sequential_forward(dense_x, lS_offset, lS_indices)
         else:
-            return self.parallel_forward(dense_x, lS_o, lS_i)
+            return self.parallel_forward(dense_x, lS_offset, lS_indices)
 
     # TODO(Yanzhou): Try hash trick to compress the model
-    def sequential_forward(self, dense_x, lS_o, lS_i):
+    def sequential_forward(self, dense_x, lS_offset, lS_indices):
         # process dense features (using bottom mlp), resulting in a row vector
         x = self.apply_mlp(dense_x, self.bot_l)
         # debug prints
@@ -371,7 +372,7 @@ class DLRM_Net(nn.Module):
         # print(x.detach().cpu().numpy())
 
         # process sparse features(using embeddings), resulting in a list of row vectors
-        ly = self.apply_emb(lS_o, lS_i, self.emb_l)
+        ly = self.apply_emb(lS_offset, lS_indices, self.emb_l)
         # for y in ly:
         #     print(y.detach().cpu().numpy())
 
@@ -390,7 +391,7 @@ class DLRM_Net(nn.Module):
 
         return z
 
-    def parallel_forward(self, dense_x, lS_o, lS_i):
+    def parallel_forward(self, dense_x, lS_offset, lS_indices):
         ### prepare model (overwrite) ###
         # WARNING: # of devices must be >= batch size in parallel_forward call
         batch_size = dense_x.size()[0]
@@ -422,17 +423,17 @@ class DLRM_Net(nn.Module):
         # print(dense_x.device)
         dense_x = scatter(dense_x, device_ids, dim=0)
         # distribute sparse features (model parallelism)
-        if (len(self.emb_l) != len(lS_o)) or (len(self.emb_l) != len(lS_i)):
+        if (len(self.emb_l) != len(lS_offset)) or (len(self.emb_l) != len(lS_indices)):
             sys.exit("ERROR: corrupted model input detected in parallel_forward call")
 
         t_list = []
         i_list = []
         for k, _ in enumerate(self.emb_l):
             d = torch.device("cuda:" + str(k % ndevices))
-            t_list.append(lS_o[k].to(d))
-            i_list.append(lS_i[k].to(d))
-        lS_o = t_list
-        lS_i = i_list
+            t_list.append(lS_offset[k].to(d))
+            i_list.append(lS_indices[k].to(d))
+        lS_offset = t_list
+        lS_indices = i_list
 
         ### compute results in parallel ###
         # bottom mlp
@@ -446,7 +447,7 @@ class DLRM_Net(nn.Module):
         # print(x)
 
         # embeddings
-        ly = self.apply_emb(lS_o, lS_i, self.emb_l)
+        ly = self.apply_emb(lS_offset, lS_indices, self.emb_l)
         # debug prints
         # print(ly)
 
@@ -620,6 +621,8 @@ if __name__ == "__main__":
     parser.add_argument("--lr-num-decay-steps", type=int, default=0)
     args = parser.parse_args()
 
+    summaryWriter = SummaryWriter()
+
     if args.mlperf_logging:
         print('command line args: ', json.dumps(vars(args)))
 
@@ -650,14 +653,14 @@ if __name__ == "__main__":
         print("Using CPU...")
 
     ### prepare training data ###
-    ln_bot = np.fromstring(args.arch_mlp_bot, dtype=int, sep="-")
+    ln_bottom = np.fromstring(args.arch_mlp_bot, dtype=int, sep="-")
     # input data
     if (args.data_generation == "dataset"):
 
-        train_data, train_ld, test_data, test_ld = \
-            dp.make_criteo_data_and_loaders(args)
-        nbatches = args.num_batches if args.num_batches > 0 else len(train_ld)
-        nbatches_test = len(test_ld)
+        train_data, train_data_loader, test_data, test_data_loader = \
+            dlrm_data.make_criteo_data_and_loaders(args)
+        nbatches = args.num_batches if args.num_batches > 0 else len(train_data_loader)
+        nbatches_test = len(test_data_loader)
 
         ln_emb = train_data.counts
         # enforce maximum limit on number of vectors per embedding
@@ -667,18 +670,18 @@ if __name__ == "__main__":
                 ln_emb
             )))
         m_den = train_data.m_den
-        ln_bot[0] = m_den
+        ln_bottom[0] = m_den
     else:
         # input and target at random
         ln_emb = np.fromstring(args.arch_embedding_size, dtype=int, sep="-")
-        m_den = ln_bot[0]
-        train_data, train_ld = dp.make_random_data_and_loader(args, ln_emb, m_den)
-        nbatches = args.num_batches if args.num_batches > 0 else len(train_ld)
+        m_den = ln_bottom[0]
+        train_data, train_data_loader = dlrm_data.make_random_data_and_loader(args, ln_emb, m_den)
+        nbatches = args.num_batches if args.num_batches > 0 else len(train_data_loader)
 
     ### parse command line arguments ###
     m_spa = args.arch_sparse_feature_size
     num_fea = ln_emb.size + 1  # num sparse + num dense features
-    m_den_out = ln_bot[ln_bot.size - 1]
+    m_den_out = ln_bottom[ln_bottom.size - 1]
     if args.arch_interaction_op == "dot":
         # approach 1: all
         # num_int = num_fea * num_fea + m_den_out
@@ -699,12 +702,12 @@ if __name__ == "__main__":
     ln_top = np.fromstring(arch_mlp_top_adjusted, dtype=int, sep="-")
 
     # sanity check: feature sizes and mlp dimensions must match
-    if m_den != ln_bot[0]:
+    if m_den != ln_bottom[0]:
         sys.exit(
             "ERROR: arch-dense-feature-size "
             + str(m_den)
             + " does not match first dim of bottom mlp "
-            + str(ln_bot[0])
+            + str(ln_bottom[0])
         )
     if args.qr_flag:
         if args.qr_operation == "concat" and 2 * m_spa != m_den_out:
@@ -760,10 +763,10 @@ if __name__ == "__main__":
         print(num_int)
         print(
             "mlp bot arch "
-            + str(ln_bot.size - 1)
+            + str(ln_bottom.size - 1)
             + " layers, with input to output dimensions:"
         )
-        print(ln_bot)
+        print(ln_bottom)
         print("# of features (sparse and dense)")
         print(num_fea)
         print("dense feature size")
@@ -780,7 +783,7 @@ if __name__ == "__main__":
         print("ln_emb: ", ln_emb)
 
         print("data (inputs and targets):")
-        for j, (X, lS_o, lS_i, T) in enumerate(train_ld):
+        for j, (X, lS_offset, lS_indices, target) in enumerate(train_data_loader):
             # early exit if nbatches was set by the user and has been exceeded
             if nbatches > 0 and j >= nbatches:
                 break
@@ -791,13 +794,13 @@ if __name__ == "__main__":
             print(
                 [
                     np.diff(
-                        S_o.detach().cpu().tolist() + list(lS_i[i].shape)
+                        S_o.detach().cpu().tolist() + list(lS_indices[i].shape)
                     ).tolist()
-                    for i, S_o in enumerate(lS_o)
+                    for i, S_o in enumerate(lS_offset)
                 ]
             )
-            print([S_i.detach().cpu().tolist() for S_i in lS_i])
-            print(T.detach().cpu().numpy())
+            print([S_i.detach().cpu().tolist() for S_i in lS_indices])
+            print(target.detach().cpu().numpy())
 
     ndevices = min(ngpus, args.mini_batch_size, num_fea - 1) if use_gpu else -1
 
@@ -808,7 +811,7 @@ if __name__ == "__main__":
     dlrm = DLRM_Net(
         m_spa,
         ln_emb,
-        ln_bot,
+        ln_bottom,
         ln_top,
         arch_interaction_op=args.arch_interaction_op,
         arch_interaction_itself=args.arch_interaction_itself,
@@ -830,12 +833,13 @@ if __name__ == "__main__":
     # print number of parameters
     def count_parameters(model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
+    """
     if args.print_parameters_num:
-        # for j, (X, lS_o, lS_i, T) in enumerate(train_ld):
-        #     print(summary(dlrm, X, lS_o, lS_i))
-        #     break
+        for j, (X, lS_offset, lS_indices, target) in enumerate(train_data_loader):
+            print(summary(dlrm, X, lS_offset, lS_indices))
+            break
         print('Total parameters_count:', count_parameters(dlrm))
-
+    """
     # test prints
     if args.debug_mode:
         print("initial parameters (weights and bias):")
@@ -982,6 +986,7 @@ if __name__ == "__main__":
 
     print("time/loss/accuracy (if enabled):")
     with torch.autograd.profiler.profile(args.enable_profiling, use_gpu) as prof:
+        iter_num = 0
         while k < args.nepochs:
             if k < skip_upto_epoch:
                 continue
@@ -991,9 +996,9 @@ if __name__ == "__main__":
             if args.mlperf_logging:
                 previous_iteration_time = None
 
-            for j, (X, lS_o, lS_i, T) in enumerate(train_ld):
+            for j, (X, lS_offset, lS_indices, target) in enumerate(train_data_loader):
                 if j == 0 and args.save_onnx:
-                    (X_onnx, lS_o_onnx, lS_i_onnx) = (X, lS_o, lS_i)
+                    (X_onnx, lS_o_onnx, lS_i_onnx) = (X, lS_offset, lS_indices)
 
                 if j < skip_upto_batch:
                     continue
@@ -1022,10 +1027,10 @@ if __name__ == "__main__":
                 '''
 
                 # forward pass
-                Z = dlrm_wrap(X, lS_o, lS_i, use_gpu, device)
+                Z = dlrm_wrap(X, lS_offset, lS_indices, use_gpu, device)
 
                 # loss
-                E = loss_fn_wrap(Z, T, use_gpu, device)
+                E = loss_fn_wrap(Z, target, use_gpu, device)
                 '''
                 # debug prints
                 print("output and loss")
@@ -1035,9 +1040,9 @@ if __name__ == "__main__":
                 # compute loss and accuracy
                 L = E.detach().cpu().numpy()  # numpy array
                 S = Z.detach().cpu().numpy()  # numpy array
-                T = T.detach().cpu().numpy()  # numpy array
-                mbs = T.shape[0]  # = args.mini_batch_size except maybe for last
-                A = np.sum((np.round(S, 0) == T).astype(np.uint8))
+                target = target.detach().cpu().numpy()  # numpy array
+                mbs = target.shape[0]  # = args.mini_batch_size except maybe for last
+                A = np.sum((np.round(S, 0) == target).astype(np.uint8))
 
                 if not args.inference_only:
                     # scaled error gradient propagation
@@ -1073,22 +1078,25 @@ if __name__ == "__main__":
 
                 # print time, loss and accuracy
                 if should_print or should_test:
-                    gT = 1000.0 * total_time / total_iter if args.print_time else -1
+                    g_time = 1000.0 * total_time / total_iter if args.print_time else -1
                     total_time = 0
 
-                    gA = total_accu / total_samp
+                    g_accuracy = total_accu / total_samp
                     total_accu = 0
 
-                    gL = total_loss / total_samp
+                    g_loss = total_loss / total_samp
                     total_loss = 0
 
                     str_run_type = "inference" if args.inference_only else "training"
                     print(
                         "Finished {} it {}/{} of epoch {}, {:.2f} ms/it, ".format(
-                            str_run_type, j + 1, nbatches, k, gT
+                            str_run_type, j + 1, nbatches, k, g_time
                         )
-                        + "loss {:.6f}, accuracy {:3.3f} %".format(gL, gA * 100)
+                        + "loss {:.6f}, accuracy {:3.3f} %".format(g_loss, g_accuracy * 100)
                     )
+                    summaryWriter.add_scalar("train/loss", g_loss, iter_num)
+                    summaryWriter.add_scalar("train/accuracy", g_accuracy, iter_num)
+
                     # Uncomment the line below to print out the total time with overhead
                     # print("Accumulated time so far: {}" \
                     # .format(time_wrap(use_gpu) - accum_time_begin))
@@ -1110,7 +1118,7 @@ if __name__ == "__main__":
                         scores = []
                         targets = []
 
-                    for i, (X_test, lS_o_test, lS_i_test, T_test) in enumerate(test_ld):
+                    for i, (X_test, lS_o_test, lS_i_test, T_test) in enumerate(test_data_loader):
                         # early exit if nbatches was set by the user and was exceeded
                         if nbatches > 0 and i >= nbatches:
                             break
@@ -1192,15 +1200,20 @@ if __name__ == "__main__":
                             # print("{} {:.4f}".format(metric_name, 1000 * (met_time)),
                             #      end="")
                         # print(" ms")
-                        gA_test = validation_results['accuracy']
-                        gL_test = validation_results['loss']
-                    else:
-                        gA_test = test_accu / test_samp
-                        gL_test = test_loss / test_samp
 
-                    is_best = gA_test > best_gA_test
+                        for metric_name, _ in metrics.items():
+                            summaryWriter.add_scalar("test/" + metric_name, validation_results[metric_name], iter_num)
+                        g_accuracy_test = validation_results['accuracy']
+                        g_loss_test = validation_results['loss']
+                    else:
+                        g_accuracy_test = test_accu / test_samp
+                        g_loss_test = test_loss / test_samp
+                        summaryWriter.add_scalar("test/loss", g_loss_test, iter_num)
+                        summaryWriter.add_scalar("test/accuracy", g_accuracy_test, iter_num)
+
+                    is_best = g_accuracy_test > best_gA_test
                     if is_best:
-                        best_gA_test = gA_test
+                        best_gA_test = g_accuracy_test
                         if not (args.save_model == ""):
                             print("Saving model to {}".format(args.save_model))
                             torch.save(
@@ -1211,10 +1224,10 @@ if __name__ == "__main__":
                                     "nbatches_test": nbatches_test,
                                     "iter": j + 1,
                                     "state_dict": dlrm.state_dict(),
-                                    "train_acc": gA,
-                                    "train_loss": gL,
-                                    "test_acc": gA_test,
-                                    "test_loss": gL_test,
+                                    "train_acc": g_accuracy,
+                                    "train_loss": g_loss,
+                                    "test_acc": g_accuracy_test,
+                                    "test_loss": g_loss_test,
                                     "total_loss": total_loss,
                                     "total_accu": total_accu,
                                     "opt_state_dict": optimizer.state_dict(),
@@ -1251,7 +1264,7 @@ if __name__ == "__main__":
                         print(
                             "Testing at - {}/{} of epoch {},".format(j + 1, nbatches, 0)
                             + " loss {:.6f}, accuracy {:3.3f} %, best {:3.3f} %".format(
-                                gL_test, gA_test * 100, best_gA_test * 100
+                                g_loss_test, g_accuracy_test * 100, best_gA_test * 100
                             )
                         )
                     # Uncomment the line below to print out the total time with overhead
@@ -1273,8 +1286,10 @@ if __name__ == "__main__":
                               + str(args.mlperf_auc_threshold)
                               + " reached, stop training")
                         break
+                iter_num += 1
 
             k += 1  # nepochs
+            # TODO: Add validation here.
 
     # profiling
     if args.enable_profiling:
