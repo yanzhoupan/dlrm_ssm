@@ -15,7 +15,7 @@ def getMaxNumOfUniqueValue():
         max_len = max(0, len(fea_dict["unique"]))
     return max_len
 
-# hashed_weight = Parameter(torch.Tensor(0))
+HASHED_WEIGHT = Parameter(torch.Tensor(0))
 
 class HashEmbeddingBag(nn.Module):
 
@@ -24,7 +24,7 @@ class HashEmbeddingBag(nn.Module):
                  embedding_dim: int,
                  compression: float,
                 #  max_len=0,
-                lens=(),
+                 lens=(),
                  hash_seed=2,
                  mode="sum"
                  ):
@@ -46,9 +46,12 @@ class HashEmbeddingBag(nn.Module):
             torch.nn.init.normal(self.hashed_weight, mean=0, std=1)
         else: # use a shared weight vector for all the hash tables
             self.hashed_weight_size = math.ceil(sum(self.lens) * self.embedding_dim * compression)
-            global hashed_weight
-            hashed_weight = Parameter(torch.Tensor(self.hashed_weight_size))
-            torch.nn.init.normal(hashed_weight, mean=0, std=1)
+            global HASHED_WEIGHT
+            if HASHED_WEIGHT.size() == torch.Size([0]):
+                HASHED_WEIGHT = Parameter(torch.Tensor(self.hashed_weight_size))
+                torch.nn.init.normal(HASHED_WEIGHT, mean=0, std=1)
+            self.hashed_weight = HASHED_WEIGHT
+
             # print("SharedHashbag, hashed_weight_size: ", len(hashed_weight))
             # self.hashed_weight = hashed_weight
         
@@ -73,12 +76,16 @@ class HashEmbeddingBag(nn.Module):
         return idx
 
     def forward(self, x, offsets=None):
-        # print("Forward: ", self.hashed_weight[self.weight_idx])
-        if not self.lens:
-            return F.embedding_bag(x, self.hashed_weight[self.weight_idx], offsets=offsets, mode=self.mode)
-        else:
-            # global hashed_weight
-            return F.embedding_bag(x, hashed_weight[self.weight_idx], offsets=offsets, mode=self.mode)
+        # if not self.lens:
+        self.weight_idx = self.weight_idx.to(x.device)
+        self.hashed_weight = self.hashed_weight.to(x.device)
+        # print("Forward: ", x.device, self.hashed_weight.device, self.weight_idx.device)
+        return F.embedding_bag(x, self.hashed_weight[self.weight_idx], offsets=offsets, mode=self.mode)
+        # else:
+        #     # global hashed_weight
+        #     return F.embedding_bag(x, hashed_weight[self.weight_idx], offsets=offsets, mode=self.mode)
+
+
 
 def hashEmbeddingBagTest():
     # test hashEmbeddingBag

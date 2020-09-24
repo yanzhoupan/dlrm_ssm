@@ -201,7 +201,7 @@ class DLRM_Net(nn.Module):
                 EE.embs.weight.data = torch.tensor(W, requires_grad=True)
 
             elif self.rand_hash_emb_flag:
-                EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, lens=tuple(ln), mode="sum")
+                EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, mode="sum") # lens=tuple(ln)
 
             else:
                 EE = nn.EmbeddingBag(n, m, mode="sum", sparse=True)
@@ -623,7 +623,7 @@ if __name__ == "__main__":
     if args.mlperf_logging:
         print('command line args: ', json.dumps(vars(args)))
 
-    print("+++++======++++++======args.rand_hash_emb_flag: ", args.rand_hash_emb_flag, )
+    # print("+++++======++++++======args.rand_hash_emb_flag: ", args.rand_hash_emb_flag, )
 
     ### some basic setup ###
     np.random.seed(args.numpy_rand_seed)
@@ -831,9 +831,9 @@ if __name__ == "__main__":
     def count_parameters(model):
         return sum(p.numel() for p in model.parameters() if p.requires_grad)
     if args.print_parameters_num:
-        for j, (X, lS_o, lS_i, T) in enumerate(train_ld):
-            print(summary(dlrm, X, lS_o, lS_i))
-            break
+        # for j, (X, lS_o, lS_i, T) in enumerate(train_ld):
+        #     print(summary(dlrm, X, lS_o, lS_i))
+        #     break
         print('Total parameters_count:', count_parameters(dlrm))
 
     # test prints
