@@ -86,7 +86,7 @@ from tricks.qr_embedding_bag import QREmbeddingBag
 from tricks.md_embedding_bag import PrEmbeddingBag, md_solver
 from tricks.hash_embedding_bag import HashEmbeddingBag
 #from torchvision import models
-#from torchsummary import summary
+# from torchsummary import summary
 from torch.utils.tensorboard import SummaryWriter
 
 import sklearn.metrics
@@ -185,7 +185,7 @@ class DLRM_Net(nn.Module):
         emb_l = nn.ModuleList()
         for i in range(0, ln.size):
             n = ln[i]
-            # print("Max number of unique cat value", max(ln), ln)
+            # print("Number of unique cat values", ln)
             
             # construct embedding operator
             if self.qr_flag and n > self.qr_threshold:
@@ -832,14 +832,19 @@ if __name__ == "__main__":
 
     # print number of parameters
     def count_parameters(model):
-        return sum(p.numel() for p in model.parameters() if p.requires_grad)
-    """
+        if args.rand_hash_emb_flag:
+            embedding_parameters = sum(ln_emb) * m_spa * args.rand_hash_compression_rate #count embedding parameters for hashnet embedding
+        else:
+            embedding_parameters = sum(ln_emb) * m_spa # count embedding parameters for original embedding
+        other_parameters = sum(p.numel() for p in model.parameters())
+        return embedding_parameters + other_parameters
+    
     if args.print_parameters_num:
-        for j, (X, lS_offset, lS_indices, target) in enumerate(train_data_loader):
-            print(summary(dlrm, X, lS_offset, lS_indices))
-            break
+        # for j, (X, lS_offset, lS_indices, target) in enumerate(train_data_loader):
+        #     print(summary(dlrm, X, lS_offset, lS_indices, device="cuda"))
+        #     break
         print('Total parameters_count:', count_parameters(dlrm))
-    """
+    
     # test prints
     if args.debug_mode:
         print("initial parameters (weights and bias):")
