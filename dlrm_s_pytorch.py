@@ -72,7 +72,7 @@ import numpy as np
 import warnings
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
-import onnx
+# import onnx
 
 # pytorch
 import torch
@@ -85,6 +85,7 @@ from tricks.qr_embedding_bag import QREmbeddingBag
 # mixed-dimension trick
 from tricks.md_embedding_bag import PrEmbeddingBag, md_solver
 from tricks.hash_embedding_bag import HashEmbeddingBag
+import hashedEmbeddingBag
 #from torchvision import models
 # from torchsummary import summary
 from torch.utils.tensorboard import SummaryWriter
@@ -202,7 +203,8 @@ class DLRM_Net(nn.Module):
                 EE.embs.weight.data = torch.tensor(W, requires_grad=True)
 
             elif self.rand_hash_emb_flag:
-                EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, mode="sum") # lens=tuple(ln)
+                # EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, mode="sum") # lens=tuple(ln)
+                EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, 1.0, "sum")
 
             else:
                 EE = nn.EmbeddingBag(n, m, mode="sum", sparse=True)
