@@ -318,6 +318,7 @@ class DLRM_Net(nn.Module):
             # The embeddings are represented as tall matrices, with sum
             # happening vertically across 0 axis, resulting in a row vector
             E = emb_l[k]
+            torch.cuda.set_device(sparse_index_group_batch.device)
             V = E(sparse_index_group_batch, sparse_offset_group_batch)
 
             ly.append(V)
@@ -465,7 +466,9 @@ class DLRM_Net(nn.Module):
         t_list = []
         for k, _ in enumerate(self.emb_l):
             d = torch.device("cuda:" + str(k % ndevices))
+            # print("ly devices: ", ly[k].device)
             y = scatter(ly[k], device_ids, dim=0)
+            
             t_list.append(y)
         # adjust the list to be ordered per device
         ly = list(map(lambda y: list(y), zip(*t_list)))
@@ -649,6 +652,7 @@ if __name__ == "__main__":
         torch.backends.cudnn.deterministic = True
         device = torch.device("cuda", 0)
         ngpus = torch.cuda.device_count()  # 1
+        # ngpus = 1 # use 1 gpu to run the code
         print("Using {} GPU(s)...".format(ngpus))
     else:
         device = torch.device("cpu")
@@ -805,6 +809,7 @@ if __name__ == "__main__":
             print(target.detach().cpu().numpy())
 
     ndevices = min(ngpus, args.mini_batch_size, num_fea - 1) if use_gpu else -1
+    # ndevices = 1 if use_gpu else -1 # use single gpu to run the code
 
     ### construct the neural network specified above ###
     # WARNING: to obtain exactly the same initialization for
