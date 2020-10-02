@@ -72,7 +72,7 @@ import numpy as np
 import warnings
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", category=DeprecationWarning)
-import onnx
+# import onnx
 
 # pytorch
 import torch
@@ -85,6 +85,7 @@ from tricks.qr_embedding_bag import QREmbeddingBag
 # mixed-dimension trick
 from tricks.md_embedding_bag import PrEmbeddingBag, md_solver
 from tricks.hash_embedding_bag import HashEmbeddingBag
+import hashedEmbeddingBag
 #from torchvision import models
 # from torchsummary import summary
 from torch.utils.tensorboard import SummaryWriter
@@ -202,7 +203,8 @@ class DLRM_Net(nn.Module):
                 EE.embs.weight.data = torch.tensor(W, requires_grad=True)
 
             elif self.rand_hash_emb_flag:
-                EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, mode="sum") # lens=tuple(ln)
+                # EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, mode="sum") # lens=tuple(ln)
+                EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, 1.0, "sum")
 
             else:
                 EE = nn.EmbeddingBag(n, m, mode="sum", sparse=True)
@@ -316,6 +318,7 @@ class DLRM_Net(nn.Module):
             # The embeddings are represented as tall matrices, with sum
             # happening vertically across 0 axis, resulting in a row vector
             E = emb_l[k]
+            torch.cuda.set_device(sparse_index_group_batch.device)
             V = E(sparse_index_group_batch, sparse_offset_group_batch)
 
             ly.append(V)
@@ -463,7 +466,9 @@ class DLRM_Net(nn.Module):
         t_list = []
         for k, _ in enumerate(self.emb_l):
             d = torch.device("cuda:" + str(k % ndevices))
+            # print("ly devices: ", ly[k].device)
             y = scatter(ly[k], device_ids, dim=0)
+            
             t_list.append(y)
         # adjust the list to be ordered per device
         ly = list(map(lambda y: list(y), zip(*t_list)))
@@ -647,6 +652,7 @@ if __name__ == "__main__":
         torch.backends.cudnn.deterministic = True
         device = torch.device("cuda", 0)
         ngpus = torch.cuda.device_count()  # 1
+        # ngpus = 1 # use 1 gpu to run the code
         print("Using {} GPU(s)...".format(ngpus))
     else:
         device = torch.device("cpu")
@@ -803,6 +809,7 @@ if __name__ == "__main__":
             print(target.detach().cpu().numpy())
 
     ndevices = min(ngpus, args.mini_batch_size, num_fea - 1) if use_gpu else -1
+    # ndevices = 1 if use_gpu else -1 # use single gpu to run the code
 
     ### construct the neural network specified above ###
     # WARNING: to obtain exactly the same initialization for
