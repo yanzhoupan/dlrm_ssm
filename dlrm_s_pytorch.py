@@ -203,8 +203,13 @@ class DLRM_Net(nn.Module):
                 EE.embs.weight.data = torch.tensor(W, requires_grad=True)
 
             elif self.rand_hash_emb_flag:
-                # EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, mode="sum") # lens=tuple(ln)
-                EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, 1.0, "sum")
+                EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, mode="sum", sparse=True) # lens=tuple(ln)
+                # EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, 1.0, "sum")
+                W = np.random.uniform(
+                    low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=((int(n * m * self.rand_hash_compression_rate), ))
+                ).astype(np.float32)
+
+                EE.hashed_weight.data = torch.tensor(W, requires_grad=True)
 
             else:
                 EE = nn.EmbeddingBag(n, m, mode="sum", sparse=True)
@@ -318,7 +323,7 @@ class DLRM_Net(nn.Module):
             # The embeddings are represented as tall matrices, with sum
             # happening vertically across 0 axis, resulting in a row vector
             E = emb_l[k]
-            torch.cuda.set_device(sparse_index_group_batch.device)
+            # torch.cuda.set_device(sparse_index_group_batch.device)
             V = E(sparse_index_group_batch, sparse_offset_group_batch)
 
             ly.append(V)
@@ -651,8 +656,8 @@ if __name__ == "__main__":
         torch.cuda.manual_seed_all(args.numpy_rand_seed)
         torch.backends.cudnn.deterministic = True
         device = torch.device("cuda", 0)
-        ngpus = torch.cuda.device_count()  # 1
-        # ngpus = 1 # use 1 gpu to run the code
+        # ngpus = torch.cuda.device_count()  # 1
+        ngpus = 1 # use 1 gpu to run the code
         print("Using {} GPU(s)...".format(ngpus))
     else:
         device = torch.device("cpu")
@@ -808,8 +813,8 @@ if __name__ == "__main__":
             print([S_i.detach().cpu().tolist() for S_i in lS_indices])
             print(target.detach().cpu().numpy())
 
-    ndevices = min(ngpus, args.mini_batch_size, num_fea - 1) if use_gpu else -1
-    # ndevices = 1 if use_gpu else -1 # use single gpu to run the code
+    # ndevices = min(ngpus, args.mini_batch_size, num_fea - 1) if use_gpu else -1
+    ndevices = 1 if use_gpu else -1 # use single gpu to run the code
 
     ### construct the neural network specified above ###
     # WARNING: to obtain exactly the same initialization for
