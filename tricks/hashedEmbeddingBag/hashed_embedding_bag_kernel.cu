@@ -64,9 +64,8 @@ __device__ __host__ int64_t hash_func_backup(int64_t a, int64_t b) {
 }
 
 __device__ __host__ int64_t hash_func(int64_t a, int64_t b) {
-    return (a * 9824516537u + b * 57857966300227u) % 117130198221199u;
-    // TODO: change to linear hash function
-    // return a * 16 + b;
+    // return (a * 9824516537u + b * 57857966300227u) % 117130198221199u;
+    return a * 16 + b;
 }
 
 template<typename scalar_t>

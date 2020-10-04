@@ -26,7 +26,8 @@ class HashEmbeddingBag(nn.Module):
                 #  max_len=0,
                  lens=(),
                  hash_seed=2,
-                 mode="sum"
+                 mode="sum",
+                 sparse=False
                  ):
         super(HashEmbeddingBag, self).__init__()
         self.num_embeddings = num_embeddings
@@ -35,15 +36,16 @@ class HashEmbeddingBag(nn.Module):
         self.lens = lens
         self.hash_seed = hash_seed
         self.mode = mode
+        self.sparse = sparse
 
         self.xxhash = xxhash
 
         if not self.lens: # use a hashed weight vector for each hash table
-            self.hashed_weight_size = math.ceil(self.num_embeddings * self.embedding_dim * compression)
+            self.hashed_weight_size = int(self.num_embeddings * self.embedding_dim * compression)
             self.hashed_weight = Parameter(torch.Tensor(self.hashed_weight_size))
             torch.nn.init.normal_(self.hashed_weight)
         else: # use a shared weight vector for all the hash tables
-            self.hashed_weight_size = math.ceil(sum(self.lens) * self.embedding_dim * compression)
+            self.hashed_weight_size = int(sum(self.lens) * self.embedding_dim * compression)
             global HASHED_WEIGHT
             if HASHED_WEIGHT.size() == torch.Size([0]):
                 HASHED_WEIGHT = Parameter(torch.Tensor(self.hashed_weight_size))
@@ -106,7 +108,7 @@ class HashEmbeddingBag(nn.Module):
         self.weight_idx = self.weight_idx.to(x.device)
         self.hashed_weight = self.hashed_weight.to(x.device)
         # print("Forward: ", self.hashed_weight, self.hashed_weight[self.weight_idx])
-        return F.embedding_bag(x, self.hashed_weight[self.weight_idx], offsets=offsets, mode=self.mode)
+        return F.embedding_bag(x, self.hashed_weight[self.weight_idx], offsets=offsets, mode=self.mode, sparse=self.sparse)
 
 def hashEmbeddingBagTest():
     # test hashEmbeddingBag
