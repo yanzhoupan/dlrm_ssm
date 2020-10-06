@@ -31,7 +31,7 @@ if [ $run_pytorch = 1 ]; then
     # --arch-embedding-size=... (sparse feature sizes)
     # --arch-mlp-bot=... (the input to the first layer of bottom mlp)
 #   
-    $dlrm_pt_bin --rand-hash-emb-flag --rand-hash-compression-rate=0.125 --arch-sparse-feature-size=16 --arch-mlp-bot="13-512-256-64-16" --arch-mlp-top="512-256-1" --data-generation=dataset --data-set=kaggle --raw-data-file=./input/train.txt --processed-data-file=./input/kaggleAdDisplayChallenge_processed.npz --loss-function=bce --round-targets=True --learning-rate=0.1 --mini-batch-size=2048 --nepochs=$nepochs --print-freq=1024 --print-time --test-mini-batch-size=16384 --test-num-workers=16 --test-freq=1000 --use-gpu --mlperf-logging --save-model=model.dat $dlrm_extra_option 2>&1 | tee run_kaggle_pt.log
+    $dlrm_pt_bin --rand-hash-emb-flag --rand-hash-compression-rate=0.03125 --arch-sparse-feature-size=16 --arch-mlp-bot="13-512-256-64-16" --arch-mlp-top="512-256-1" --data-generation=dataset --data-set=kaggle --raw-data-file=./input/train.txt --processed-data-file=./input/kaggleAdDisplayChallenge_processed.npz --loss-function=bce --round-targets=True --learning-rate=0.1 --mini-batch-size=2048 --nepochs=$nepochs --print-freq=1024 --print-time --test-mini-batch-size=16384 --test-num-workers=16 --test-freq=1000 --use-gpu --mlperf-logging --save-model=model.dat $dlrm_extra_option 2>&1 | tee run_kaggle_pt.log
 fi
 
 if [ $run_caffe2 = 1 ]; then

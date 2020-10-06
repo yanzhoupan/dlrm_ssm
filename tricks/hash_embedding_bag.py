@@ -54,7 +54,7 @@ class HashEmbeddingBag(nn.Module):
                 torch.nn.init.normal_(HASHED_WEIGHT)
             self.hashed_weight = HASHED_WEIGHT
 
-        self.weight_idx = self.linear_hash_func(self.hashed_weight_size, self.num_embeddings, self.embedding_dim, "idxW")
+        self.weight_idx = self.uni_hash_func(self.hashed_weight_size, self.num_embeddings, self.embedding_dim, "idxW")
 
 
     def xxhash_func(self, hN, size_out, size_in, extra_str=''):
@@ -82,7 +82,8 @@ class HashEmbeddingBag(nn.Module):
         idx = torch.LongTensor(size_out, size_in)
         for i in range(size_out):
             for j in range(size_in):
-                idx[i, j] = (i * 9824516537 + j) % hN
+                # idx[i, j] = (i * 9824516537 + j) % hN
+                idx[i, j] = ((i * 32452843 + j * 86028121) % 512927357) % hN
         return idx
     
     def cantor_pairing_hash_func(self, hN, size_out, size_in, extra_str=''):

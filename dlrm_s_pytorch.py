@@ -861,11 +861,11 @@ if __name__ == "__main__":
         other_parameters = sum(p.numel() for p in model.parameters())
         return embedding_parameters + other_parameters
     
-    if args.print_parameters_num:
+    # if args.print_parameters_num:
         # for j, (X, lS_offset, lS_indices, target) in enumerate(train_data_loader):
         #     print(summary(dlrm, X, lS_offset, lS_indices, device="cuda"))
         #     break
-        print('Total parameters_count:', count_parameters(dlrm))
+        # print('Total parameters_count:', count_parameters(dlrm))
     
     # test prints
     if args.debug_mode:
