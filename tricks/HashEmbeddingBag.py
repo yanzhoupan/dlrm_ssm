@@ -15,7 +15,7 @@ class HashEmbeddingBag(nn.Module):
                  compression: float,
                  hash_seed=2):
         super(HashEmbeddingBag, self).__init__()
-
+        print("hahaha")
         self.num_embeddings = num_embeddings
         self.embedding_dim = embedding_dim
         self.compression = compression
@@ -41,7 +41,6 @@ class HashEmbeddingBag(nn.Module):
 
                 # Wrap hashed values to the compressed range
                 idx[i, j] = self.xxhash.xxh32(key, self.hash_seed).intdigest() % hN
-
         return idx
 
     def forward(self, x):

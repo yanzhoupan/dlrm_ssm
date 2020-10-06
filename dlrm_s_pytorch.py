@@ -60,6 +60,7 @@ import functools
 # import shutil
 import time
 import json
+from os import path
 # data generation
 import dlrm_data_pytorch as dlrm_data
 
@@ -203,7 +204,7 @@ class DLRM_Net(nn.Module):
                 EE.embs.weight.data = torch.tensor(W, requires_grad=True)
 
             elif self.rand_hash_emb_flag:
-                EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, mode="sum", sparse=True) # lens=tuple(ln)
+                EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, mode="sum") # lens=tuple(ln)
                 # EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, 1.0, "sum")
                 W = np.random.uniform(
                     low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=((int(n * m * self.rand_hash_compression_rate), ))
@@ -211,14 +212,23 @@ class DLRM_Net(nn.Module):
 
                 EE.hashed_weight.data = torch.tensor(W, requires_grad=True)
 
+            # elif self.lsh_hash_emb_flag:
+            #     if have current hash table in file:
+            #         min_hash_table = get the min_hash_table for the current cat from the data file
+            #     else:
+            #         min_hash_table = generate the hash table use minHashGenerator
+                
+            #     EE = lshEmbeddingBag(min_hash_table, self.lsh_hash_compression_rate, mode="sum")
+
             else:
-                EE = nn.EmbeddingBag(n, m, mode="sum", sparse=True)
+                EE = nn.EmbeddingBag(n, m, mode="sum", sparse=False)
 
                 # initialize embeddings
                 # nn.init.uniform_(EE.weight, a=-np.sqrt(1 / n), b=np.sqrt(1 / n))
                 W = np.random.uniform(
                     low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=(n, m)
                 ).astype(np.float32)
+                # torch.nn.init.normal_(EE.weight)
                 # approach 1
                 EE.weight.data = torch.tensor(W, requires_grad=True)
                 # approach 2
@@ -656,8 +666,8 @@ if __name__ == "__main__":
         torch.cuda.manual_seed_all(args.numpy_rand_seed)
         torch.backends.cudnn.deterministic = True
         device = torch.device("cuda", 0)
-        # ngpus = torch.cuda.device_count()  # 1
-        ngpus = 1 # use 1 gpu to run the code
+        ngpus = torch.cuda.device_count()  # 1
+        # ngpus = 1 # use 1 gpu to run the code
         print("Using {} GPU(s)...".format(ngpus))
     else:
         device = torch.device("cpu")
@@ -813,8 +823,8 @@ if __name__ == "__main__":
             print([S_i.detach().cpu().tolist() for S_i in lS_indices])
             print(target.detach().cpu().numpy())
 
-    # ndevices = min(ngpus, args.mini_batch_size, num_fea - 1) if use_gpu else -1
-    ndevices = 1 if use_gpu else -1 # use single gpu to run the code
+    ndevices = min(ngpus, args.mini_batch_size, num_fea - 1) if use_gpu else -1
+    # ndevices = 1 if use_gpu else -1 # use single gpu to run the code
 
     ### construct the neural network specified above ###
     # WARNING: to obtain exactly the same initialization for
@@ -885,6 +895,11 @@ if __name__ == "__main__":
 
     if not args.inference_only:
         # specify the optimizer algorithm
+        total_para = 0
+        for name,parameters in dlrm.named_parameters():
+            print(name,':',parameters.size())
+            total_para += parameters.numel()
+        print("+++++++++ Total parameter cnt: ", total_para, "+++++++++")
         optimizer = torch.optim.SGD(dlrm.parameters(), lr=args.learning_rate)
         lr_scheduler = LRPolicyScheduler(optimizer, args.lr_num_warmup_steps, args.lr_decay_start_step,
                                          args.lr_num_decay_steps)
@@ -1113,6 +1128,10 @@ if __name__ == "__main__":
                     )
                     summaryWriter.add_scalar("train/loss", g_loss, iter_num)
                     summaryWriter.add_scalar("train/accuracy", g_accuracy, iter_num)
+                    summaryWriter.add_histogram("train/emb0_weight_hist", dlrm.emb_l[0].hashed_weight, iter_num)
+                    summaryWriter.add_scalar("train/emb0_weight_min", dlrm.emb_l[0].hashed_weight.min().item(), iter_num)
+                    summaryWriter.add_scalar("train/emb0_weight_max", dlrm.emb_l[0].hashed_weight.max().item(), iter_num)
+                    summaryWriter.add_scalar("train/emb0_weight_mean", dlrm.emb_l[0].hashed_weight.mean().item(), iter_num)
 
                     # Uncomment the line below to print out the total time with overhead
                     # print("Accumulated time so far: {}" \

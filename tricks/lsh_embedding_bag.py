@@ -47,6 +47,7 @@ class LshEmbeddingBag(nn.Module):
 
         self.lsh_weight_size = math.ceil(num_embeddings * self.embedding_dim * compression)
         self.weight = Parameter(torch.Tensor(self.lsh_weight_size))
+        print("weight(embedding table): ", self.weight)
         assert (mode in ["sum", "mean"])
         self._mode = mode
 
@@ -96,6 +97,7 @@ class LshEmbeddingBag(nn.Module):
 
         # get the min-hash for each category value, note that lsh_weight_index is in cpu memory
         lsh_weight_index = self._minhash_table[indices]
+        print("In forward: ", lsh_weight_index, indices, self._minhash_table[indices], self.lsh_weight_size)
 
         # move the min-hash values to target device
         lsh_weight_index = lsh_weight_index.to(self.weight.device)
@@ -103,13 +105,15 @@ class LshEmbeddingBag(nn.Module):
 
         # indices_embedding_vector is a |indices| x |embedding_dim| tensor.
         indices_embedding_vectors = self.weight[lsh_weight_index]
+        print('indices_embedding_vectors: ', lsh_weight_index, indices_embedding_vectors)
 
         # multiply embedding vectors by weights
         if per_index_weights is not None:
             per_index_weights = per_index_weights.to(indices_embedding_vectors.device)
             indices_embedding_vectors *= per_index_weights[:, None]
-
+        print("per_index_weights",per_index_weights)
         offsets2bag = make_offset2bag(offsets, indices)
+        print("offsets2bag: ", offsets2bag)
         if self._mode == "sum" or self._mode == "mean":
             result = \
                 torch.zeros(num_bags, self.embedding_dim, dtype=indices_embedding_vectors.dtype,
@@ -128,14 +132,14 @@ def lshEmbeddingBagTest():
     min_hash_table = torch.LongTensor(
         [[0, 1],
          [2, 3],
-         [4, 5],
+         [0, 1],
          [6, 7],
          [8, 9]]
     )
-    embedding_bag = LshEmbeddingBag(min_hash_table, 5, mode="mean")
+    embedding_bag = LshEmbeddingBag(min_hash_table, .5, mode="mean")
     test_indices = torch.LongTensor([0, 1, 2, 3, 4])
 
-    test_offset = torch.LongTensor([0, 2])
+    test_offset = torch.LongTensor([0,1,2,3,4])
     test_per_sample_weight = torch.DoubleTensor([2, 3, 2, 3, 2])
     print(embedding_bag.forward(test_indices, test_offset, test_per_sample_weight))
 
@@ -144,7 +148,7 @@ def lshEmbeddingBagTest():
 
     test_offset = torch.LongTensor([0, 2]).cuda()
     test_per_sample_weight = torch.DoubleTensor([2, 3, 2, 3, 2]).cuda()
-    print(embedding_bag.forward(test_indices, test_offset, test_per_sample_weight))
+    # print(embedding_bag.forward(test_indices, test_offset, test_per_sample_weight))
 
 if __name__ == "__main__":
     lshEmbeddingBagTest()

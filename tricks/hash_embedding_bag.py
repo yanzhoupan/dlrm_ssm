@@ -42,8 +42,10 @@ class HashEmbeddingBag(nn.Module):
 
         if not self.lens: # use a hashed weight vector for each hash table
             self.hashed_weight_size = int(self.num_embeddings * self.embedding_dim * compression)
+            # self.hashed_weight_size = max(self.hashed_weight_size, 16)
             self.hashed_weight = Parameter(torch.Tensor(self.hashed_weight_size))
-            torch.nn.init.normal_(self.hashed_weight)
+            # torch.nn.init.normal_(self.hashed_weight)
+            # print('No init inside!')
         else: # use a shared weight vector for all the hash tables
             self.hashed_weight_size = int(sum(self.lens) * self.embedding_dim * compression)
             global HASHED_WEIGHT
