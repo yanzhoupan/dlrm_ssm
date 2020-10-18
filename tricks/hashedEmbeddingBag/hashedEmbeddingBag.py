@@ -73,9 +73,10 @@ class HashedEmbeddingBag(nn.Module):
             self.weight = Parameter(torch.Tensor(weight_size))
             self.reset_parameters()
         else:
-            assert len(_weight.shape) == 1 and _weight.shape[0] == weight_size, \
-                'Shape of weight does not match num_embeddings and embedding_dim'
+            #assert len(_weight.shape) == 1 and _weight.shape[0] == weight_size, \
+            #    'Shape of weight does not match num_embeddings and embedding_dim'
             self.weight = Parameter(_weight)
+            self.weight_size = self.weight.numel()
         self.mode = mode
 
     def reset_parameters(self) -> None:

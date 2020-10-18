@@ -87,6 +87,9 @@ from tricks.qr_embedding_bag import QREmbeddingBag
 from tricks.md_embedding_bag import PrEmbeddingBag, md_solver
 from tricks.hash_embedding_bag import HashEmbeddingBag
 import hashedEmbeddingBag
+from tricks.lsh_pretraining import getMinHashTable
+from tricks.lsh_embedding_bag import LshEmbeddingBag
+import os
 #from torchvision import models
 # from torchsummary import summary
 from torch.utils.tensorboard import SummaryWriter
@@ -184,6 +187,11 @@ class DLRM_Net(nn.Module):
     #   2. Try the LSH trick to create embeddings. Something like smartHashingEmbeddingBag(n, m, mode="sum", sparse=True).
     #       -> need pre process to make the n smaller
     def create_emb(self, m, ln):
+        if not self.md_flag:
+            HASHED_WEIGHT = torch.from_numpy(np.random.uniform(
+                    low=-np.sqrt(1 / max(ln)), high=np.sqrt(1 / max(ln)), size=((int(sum(ln) * m * self.lsh_emb_compression_rate),))
+            ).astype(np.float32))
+
         emb_l = nn.ModuleList()
         for i in range(0, ln.size):
             n = ln[i]
@@ -204,21 +212,35 @@ class DLRM_Net(nn.Module):
                 EE.embs.weight.data = torch.tensor(W, requires_grad=True)
 
             elif self.rand_hash_emb_flag:
-                EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, mode="sum") # lens=tuple(ln)
-                # EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, 1.0, "sum")
+                lens = tuple(ln)
+                EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, lens=lens, mode="sum", _weight=HASHED_WEIGHT) # 
+
+                # EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, self.rand_hash_compression_rate, "sum", HASHED_WEIGHT)
+                # if lens:
+                #     W = np.random.uniform(
+                #         low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=((int(sum(lens) * m * self.rand_hash_compression_rate), ))
+                #     ).astype(np.float32)
+                # else:
+                #     W = np.random.uniform(
+                #         low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=((int(n * m * self.rand_hash_compression_rate), ))
+                #     ).astype(np.float32)
+
+                # EE.hashed_weight.data = torch.tensor(W, requires_grad=True)
+
+            elif self.lsh_emb_flag:
+                if not os.path.exists('./input/minHashTables.npz') :
+                    print("Generating minhash tables...")
+                    getMinHashTable()
+                
+                min_hash_table = torch.as_tensor(np.load('./input/minHashTables.npz')['arr_'+str(i)])
+                print("Generating lsh embedding, rate: ", self.lsh_emb_compression_rate)
+                EE = LshEmbeddingBag(min_hash_table, self.lsh_emb_compression_rate, mode="sum")
+
                 W = np.random.uniform(
                     low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=((int(n * m * self.rand_hash_compression_rate), ))
                 ).astype(np.float32)
 
                 EE.hashed_weight.data = torch.tensor(W, requires_grad=True)
-
-            # elif self.lsh_hash_emb_flag:
-            #     if have current hash table in file:
-            #         min_hash_table = get the min_hash_table for the current cat from the data file
-            #     else:
-            #         min_hash_table = generate the hash table use minHashGenerator
-                
-            #     EE = lshEmbeddingBag(min_hash_table, self.lsh_hash_compression_rate, mode="sum")
 
             else:
                 EE = nn.EmbeddingBag(n, m, mode="sum", sparse=False)
@@ -260,7 +282,9 @@ class DLRM_Net(nn.Module):
         md_flag=False,
         md_threshold=200,
         rand_hash_emb_flag=False,
-        rand_hash_compression_rate=1.0
+        rand_hash_compression_rate=1.0,
+        lsh_emb_flag=False,
+        lsh_emb_compression_rate=1.0
     ):
         super(DLRM_Net, self).__init__()
 
@@ -296,10 +320,16 @@ class DLRM_Net(nn.Module):
             # create variables for hash embedding if applicable
             self.rand_hash_emb_flag = rand_hash_emb_flag
             self.rand_hash_compression_rate = rand_hash_compression_rate
+            self.lsh_emb_flag = lsh_emb_flag
+            self.lsh_emb_compression_rate = lsh_emb_compression_rate
+
             if self.rand_hash_emb_flag:
                 print("++++++++++ Using Random Hash Embedding! Compression rate is: ", self.rand_hash_compression_rate, "++++++++++")
+
+            if self.lsh_emb_flag:
+                print("++++++++++ Using LSH Embedding! Compression rate is: ", self.lsh_emb_compression_rate, "++++++++++")
             
-            if not self.qr_flag and not self.md_flag and not rand_hash_emb_flag:
+            if not self.qr_flag and not self.md_flag and not self.rand_hash_emb_flag and not self.lsh_emb_flag:
                 print("+++++++++ Using Original Embedding! +++++++++")
             
             # create operators
@@ -576,6 +606,8 @@ if __name__ == "__main__":
     parser.add_argument("--qr-collisions", type=int, default=4)
     parser.add_argument("--rand-hash-emb-flag", action="store_true", default=False)
     parser.add_argument("--rand-hash-compression-rate", type=float, default=1.0)
+    parser.add_argument("--lsh-emb-flag", action="store_true", default=False)
+    parser.add_argument("--lsh-emb-compression-rate", type=float, default=1.0)
     # activations and loss
     parser.add_argument("--activation-function", type=str, default="relu")
     parser.add_argument("--loss-function", type=str, default="mse")  # or bce or wbce
@@ -666,8 +698,8 @@ if __name__ == "__main__":
         torch.cuda.manual_seed_all(args.numpy_rand_seed)
         torch.backends.cudnn.deterministic = True
         device = torch.device("cuda", 0)
-        ngpus = torch.cuda.device_count()  # 1
-        # ngpus = 1 # use 1 gpu to run the code
+        # ngpus = torch.cuda.device_count()  # 1
+        ngpus = 1 # use 1 gpu to run the code
         print("Using {} GPU(s)...".format(ngpus))
     else:
         device = torch.device("cpu")
@@ -823,8 +855,8 @@ if __name__ == "__main__":
             print([S_i.detach().cpu().tolist() for S_i in lS_indices])
             print(target.detach().cpu().numpy())
 
-    ndevices = min(ngpus, args.mini_batch_size, num_fea - 1) if use_gpu else -1
-    # ndevices = 1 if use_gpu else -1 # use single gpu to run the code
+    # ndevices = min(ngpus, args.mini_batch_size, num_fea - 1) if use_gpu else -1
+    ndevices = 1 if use_gpu else -1 # use single gpu to run the code
 
     ### construct the neural network specified above ###
     # WARNING: to obtain exactly the same initialization for
@@ -849,7 +881,9 @@ if __name__ == "__main__":
         md_flag=args.md_flag,
         md_threshold=args.md_threshold,
         rand_hash_emb_flag=args.rand_hash_emb_flag,
-        rand_hash_compression_rate=args.rand_hash_compression_rate
+        rand_hash_compression_rate=args.rand_hash_compression_rate,
+        lsh_emb_flag=args.lsh_emb_flag,
+        lsh_emb_compression_rate=args.lsh_emb_compression_rate
     )
 
     # print number of parameters
@@ -1132,6 +1166,8 @@ if __name__ == "__main__":
                     summaryWriter.add_scalar("train/emb0_weight_min", dlrm.emb_l[0].hashed_weight.min().item(), iter_num)
                     summaryWriter.add_scalar("train/emb0_weight_max", dlrm.emb_l[0].hashed_weight.max().item(), iter_num)
                     summaryWriter.add_scalar("train/emb0_weight_mean", dlrm.emb_l[0].hashed_weight.mean().item(), iter_num)
+                    diff = dlrm.emb_l[0].hashed_weight.data != dlrm.emb_l[1].hashed_weight.data
+                    print("Num of different numbers between emb0's weights and emb1's weights: ", diff.sum().item())
 
                     # Uncomment the line below to print out the total time with overhead
                     # print("Accumulated time so far: {}" \

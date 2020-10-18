@@ -1,3 +1,4 @@
+from typing import Optional
 import torch
 import torch.nn as nn
 from torch.nn import Parameter
@@ -15,7 +16,7 @@ def getMaxNumOfUniqueValue():
         max_len = max(0, len(fea_dict["unique"]))
     return max_len
 
-HASHED_WEIGHT = Parameter(torch.Tensor(0))
+HASHED_WEIGHT = torch.Tensor(0)
 
 class HashEmbeddingBag(nn.Module):
 
@@ -23,11 +24,11 @@ class HashEmbeddingBag(nn.Module):
                  num_embeddings: int,
                  embedding_dim: int,
                  compression: float,
-                #  max_len=0,
                  lens=(),
                  hash_seed=2,
                  mode="sum",
-                 sparse=False
+                 sparse=False,
+                 _weight: Optional[torch.Tensor] = None
                  ):
         super(HashEmbeddingBag, self).__init__()
         self.num_embeddings = num_embeddings
@@ -37,24 +38,42 @@ class HashEmbeddingBag(nn.Module):
         self.hash_seed = hash_seed
         self.mode = mode
         self.sparse = sparse
-
         self.xxhash = xxhash
+
+        # if _weight is None:
+        #     self.hashed_weight_size = int(self.num_embeddings * self.embedding_dim * compression)
+        #     # self.hashed_weight_size = max(self.hashed_weight_size, 16)
+        #     self.hashed_weight = Parameter(torch.Tensor(self.hashed_weight_size))
+        #     W = np.random.uniform(
+        #                 low=-np.sqrt(1 / self.num_embeddings), high=np.sqrt(1 / self.num_embeddings), size=((int(self.num_embeddings * self.embedding_dim * self.rand_hash_compression_rate), ))
+        #             ).astype(np.float32)
+        #     self.hashed_weight.data = torch.tensor(W, requires_grad=True)
+        # else:
+        #     #assert len(_weight.shape) == 1 and _weight.shape[0] == weight_size, \
+        #     #    'Shape of weight does not match num_embeddings and embedding_dim'
+        #     self.hashed_weight = Parameter(_weight)
+        #     self.hashed_weight_size = self.hashed_weight.numel()
 
         if not self.lens: # use a hashed weight vector for each hash table
             self.hashed_weight_size = int(self.num_embeddings * self.embedding_dim * compression)
             # self.hashed_weight_size = max(self.hashed_weight_size, 16)
             self.hashed_weight = Parameter(torch.Tensor(self.hashed_weight_size))
-            # torch.nn.init.normal_(self.hashed_weight)
-            # print('No init inside!')
+
         else: # use a shared weight vector for all the hash tables
             self.hashed_weight_size = int(sum(self.lens) * self.embedding_dim * compression)
             global HASHED_WEIGHT
             if HASHED_WEIGHT.size() == torch.Size([0]):
-                HASHED_WEIGHT = Parameter(torch.Tensor(self.hashed_weight_size))
-                torch.nn.init.normal_(HASHED_WEIGHT)
-            self.hashed_weight = HASHED_WEIGHT
+                print("Using a shared weight vector for all the hash tables, hashed weight size:: ", self.hashed_weight_size)
+                HASHED_WEIGHT = torch.Tensor(self.hashed_weight_size)
+                W = np.random.uniform(
+                    low=-np.sqrt(1 / sum(self.lens)), high=np.sqrt(1 / sum(self.lens)), size=((self.hashed_weight_size, ))
+                ).astype(np.float32)
+                HASHED_WEIGHT.data = torch.tensor(W, requires_grad=True)
+            self.hashed_weight = Parameter(HASHED_WEIGHT)
+            
+            
 
-        self.weight_idx = self.uni_hash_func(self.hashed_weight_size, self.num_embeddings, self.embedding_dim, "idxW")
+        self.weight_idx = self.xxhash_func(self.hashed_weight_size, self.num_embeddings, self.embedding_dim, "idxW")
 
 
     def xxhash_func(self, hN, size_out, size_in, extra_str=''):
@@ -108,8 +127,8 @@ class HashEmbeddingBag(nn.Module):
         return idx
 
     def forward(self, x, offsets=None):
-        self.weight_idx = self.weight_idx.to(x.device)
-        self.hashed_weight = self.hashed_weight.to(x.device)
+        # self.weight_idx = self.weight_idx.to(x.device)
+        # self.hashed_weight = self.hashed_weight.to(x.device)
         # print("Forward: ", self.hashed_weight, self.hashed_weight[self.weight_idx])
         return F.embedding_bag(x, self.hashed_weight[self.weight_idx], offsets=offsets, mode=self.mode, sparse=self.sparse)
 

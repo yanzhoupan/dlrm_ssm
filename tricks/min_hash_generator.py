@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from typing import Set, Any
+from primesieve import nth_prime
 
 # minhash generator (based on permutation)
 class SparseBitVectorMinHashGenerator:
@@ -9,21 +10,30 @@ class SparseBitVectorMinHashGenerator:
                  num_perm=128):
         self.input_size = input_size
         self.num_perm = num_perm
-        self.permutations = [np.random.permutation(self.input_size) for _ in range(self.num_perm)]
+        # self.permutations = [np.random.permutation(self.input_size) for _ in range(self.num_perm)]
+        # self.permutation_start = np.random.randint(0, self.input_size, self.num_perm)
+        self.permutation_hashes = [self.generate_hash() for _ in range(self.num_perm)]
+
+    def generate_hash(self):
+        a_idx = np.random.randint(10000, 1000000)
+        a = nth_prime(a_idx)
+        b_idx = np.random.randint(10000, 1000000)
+        b = nth_prime(b_idx)
+        c_idx = np.random.randint(10000, 1000000)
+        c = nth_prime(c_idx)
+        return lambda x: (a * x + b) % c % self.input_size
 
     def generate(self, sparse_bit_vector):
-        idx_set: Set[Any] = set(sparse_bit_vector)
-        result = np.zeros(self.num_perm, dtype=np.int)
-        for result_idx, permutation in enumerate(self.permutations):
-            for idx in range(self.input_size):
-                if permutation[idx] in idx_set:
-                    result[result_idx] = idx + 1
-                    break
+        result = np.full(self.num_perm, self.input_size, dtype=np.int)
+        for r in sparse_bit_vector:
+            for i in range(self.num_perm):
+                hashed_value = self.permutation_hashes[i](r)
+                result[i] = min(result[i], hashed_value)
         return result
 
 
 if __name__ == "__main__":
-    gen = SparseBitVectorMinHashGenerator(1024,128)
+    gen = SparseBitVectorMinHashGenerator(1024,1024)
 
     i = torch.LongTensor([[0, 0], [0, 1], [1, 0], [1, 2], [2, 3]])
     v = torch.ones(5)

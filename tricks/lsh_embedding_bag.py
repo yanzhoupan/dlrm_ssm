@@ -25,7 +25,7 @@ def make_offset2bag(offsets, indices):
 
 class LshEmbeddingBag(nn.Module):
 
-    def __init__(self, minhash_table: torch.LongTensor, compression=1. / 64., mode="sum"):
+    def __init__(self, minhash_table: torch.LongTensor, compression=1.0, mode="sum"):
         """
         Create a LSH embedding bag layer with a min-hashing table.
         The min-hashing table contains known min-hash values for each category value.
@@ -45,9 +45,9 @@ class LshEmbeddingBag(nn.Module):
         num_embeddings = self._minhash_table.size(0)
         self.embedding_dim = self._minhash_table.size(1)
 
-        self.lsh_weight_size = math.ceil(num_embeddings * self.embedding_dim * compression)
-        self.weight = Parameter(torch.Tensor(self.lsh_weight_size))
-        print("weight(embedding table): ", self.weight)
+        self.lsh_weight_size = int(num_embeddings * self.embedding_dim * compression)
+        self.hashed_weight = Parameter(torch.Tensor(self.lsh_weight_size))
+        # print("weight(embedding table): ", self.hashed_weight)
         assert (mode in ["sum", "mean"])
         self._mode = mode
 
@@ -97,27 +97,27 @@ class LshEmbeddingBag(nn.Module):
 
         # get the min-hash for each category value, note that lsh_weight_index is in cpu memory
         lsh_weight_index = self._minhash_table[indices]
-        print("In forward: ", lsh_weight_index, indices, self._minhash_table[indices], self.lsh_weight_size)
+        # print("In forward: ", lsh_weight_index, indices, self._minhash_table[indices], self.lsh_weight_size)
 
         # move the min-hash values to target device
-        lsh_weight_index = lsh_weight_index.to(self.weight.device)
+        lsh_weight_index = lsh_weight_index.to(self.hashed_weight.device)
         lsh_weight_index %= self.lsh_weight_size
 
         # indices_embedding_vector is a |indices| x |embedding_dim| tensor.
-        indices_embedding_vectors = self.weight[lsh_weight_index]
-        print('indices_embedding_vectors: ', lsh_weight_index, indices_embedding_vectors)
+        indices_embedding_vectors = self.hashed_weight[lsh_weight_index]
+        # print('indices_embedding_vectors: ', lsh_weight_index, indices_embedding_vectors)
 
         # multiply embedding vectors by weights
         if per_index_weights is not None:
             per_index_weights = per_index_weights.to(indices_embedding_vectors.device)
             indices_embedding_vectors *= per_index_weights[:, None]
-        print("per_index_weights",per_index_weights)
+        # print("per_index_weights",per_index_weights)
         offsets2bag = make_offset2bag(offsets, indices)
-        print("offsets2bag: ", offsets2bag)
+        # print("offsets2bag: ", offsets2bag)
         if self._mode == "sum" or self._mode == "mean":
             result = \
                 torch.zeros(num_bags, self.embedding_dim, dtype=indices_embedding_vectors.dtype,
-                            device=self.weight.device)
+                            device=self.hashed_weight.device)
             result.index_add_(0, offsets2bag, indices_embedding_vectors)
             if self._mode == "sum":
                 return result
@@ -137,7 +137,11 @@ def lshEmbeddingBagTest():
          [8, 9]]
     )
     embedding_bag = LshEmbeddingBag(min_hash_table, .5, mode="mean")
+    print(embedding_bag.hashed_weight.size())
     test_indices = torch.LongTensor([0, 1, 2, 3, 4])
+
+    embedding_bag = LshEmbeddingBag(min_hash_table, .8, mode="mean")
+    print(embedding_bag.hashed_weight.size())
 
     test_offset = torch.LongTensor([0,1,2,3,4])
     test_per_sample_weight = torch.DoubleTensor([2, 3, 2, 3, 2])
