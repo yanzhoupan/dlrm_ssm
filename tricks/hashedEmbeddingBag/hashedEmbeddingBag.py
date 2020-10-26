@@ -3,8 +3,9 @@ from typing import Optional
 import torch
 import torch.nn as nn
 import torch.nn.init as init
-
+import numpy as np
 from torch.nn.parameter import Parameter
+import math
 
 import hashed_embedding_bag
 
@@ -68,23 +69,31 @@ class HashedEmbeddingBag(nn.Module):
         super(HashedEmbeddingBag, self).__init__()
         self.num_embeddings = num_embeddings
         self.embedding_dim = embedding_dim
-        weight_size = num_embeddings * embedding_dim * compression
+        weight_size = int(num_embeddings * embedding_dim * compression)
+        print("Inside HashedEmbeddingBag: ", num_embeddings, embedding_dim, compression, weight_size)
         if _weight is None:
-            self.weight = Parameter(torch.Tensor(weight_size))
-            self.reset_parameters()
+            low = -math.sqrt(1 / self.num_embeddings)
+            high = math.sqrt(1 / self.num_embeddings)
+            self.hashed_weight = Parameter(torch.rand(weight_size) * (high - low) + low)
+            #self.reset_parameters()
+            print("Inside HashedEmbeddingBag (after reset): ", num_embeddings, embedding_dim, compression, weight_size, self.hashed_weight.shape)
         else:
             #assert len(_weight.shape) == 1 and _weight.shape[0] == weight_size, \
             #    'Shape of weight does not match num_embeddings and embedding_dim'
-            self.weight = Parameter(_weight)
-            self.weight_size = self.weight.numel()
+            self.hashed_weight = Parameter(_weight)
+            self.weight_size = self.hashed_weight.numel()
         self.mode = mode
-
+    """
     def reset_parameters(self) -> None:
-        init.normal_(self.weight)
-
+        # init.normal_(self.weight)
+        W = np.random.uniform(
+                low=-np.sqrt(1 / self.num_embeddings), high=np.sqrt(1 / self.num_embeddings), size=(self.hashed_weight.shape[0], )
+            ).astype(np.float32)
+        self.hashed_weight.data = torch.tensor(W, requires_grad=True)
+    """
     def forward(self, indices: torch.Tensor, offsets: Optional[torch.Tensor] = None) -> torch.Tensor:
         return HashedEmbeddingBagFunction.apply(
-            self.weight,
+            self.hashed_weight,
             indices,
             offsets,
             self.mode,

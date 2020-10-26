@@ -187,10 +187,10 @@ class DLRM_Net(nn.Module):
     #   2. Try the LSH trick to create embeddings. Something like smartHashingEmbeddingBag(n, m, mode="sum", sparse=True).
     #       -> need pre process to make the n smaller
     def create_emb(self, m, ln):
-        if not self.md_flag:
-            HASHED_WEIGHT = torch.from_numpy(np.random.uniform(
-                    low=-np.sqrt(1 / max(ln)), high=np.sqrt(1 / max(ln)), size=((int(sum(ln) * m * self.lsh_emb_compression_rate),))
-            ).astype(np.float32))
+        # if not self.md_flag and self.rand_hash_emb_flag:
+        #     self.hashed_weight = nn.Parameter(torch.from_numpy(np.random.uniform(
+        #             low=-np.sqrt(1 / max(ln)), high=np.sqrt(1 / max(ln)), size=((int(sum(ln) * m * self.rand_hash_compression_rate),))
+        #     ).astype(np.float32)))
 
         emb_l = nn.ModuleList()
         for i in range(0, ln.size):
@@ -213,9 +213,9 @@ class DLRM_Net(nn.Module):
 
             elif self.rand_hash_emb_flag:
                 lens = tuple(ln)
-                EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, lens=lens, mode="sum", _weight=HASHED_WEIGHT) # 
+                # EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, lens=lens, mode="sum") # , _weight=self.hashed_weight
 
-                # EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, self.rand_hash_compression_rate, "sum", HASHED_WEIGHT)
+                EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, self.rand_hash_compression_rate, "sum")
                 # if lens:
                 #     W = np.random.uniform(
                 #         low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=((int(sum(lens) * m * self.rand_hash_compression_rate), ))
@@ -324,6 +324,7 @@ class DLRM_Net(nn.Module):
             self.lsh_emb_compression_rate = lsh_emb_compression_rate
 
             if self.rand_hash_emb_flag:
+                # self.hashed_weight = None
                 print("++++++++++ Using Random Hash Embedding! Compression rate is: ", self.rand_hash_compression_rate, "++++++++++")
 
             if self.lsh_emb_flag:
@@ -363,7 +364,7 @@ class DLRM_Net(nn.Module):
             # The embeddings are represented as tall matrices, with sum
             # happening vertically across 0 axis, resulting in a row vector
             E = emb_l[k]
-            # torch.cuda.set_device(sparse_index_group_batch.device)
+            torch.cuda.set_device(sparse_index_group_batch.device)
             V = E(sparse_index_group_batch, sparse_offset_group_batch)
 
             ly.append(V)
@@ -698,8 +699,8 @@ if __name__ == "__main__":
         torch.cuda.manual_seed_all(args.numpy_rand_seed)
         torch.backends.cudnn.deterministic = True
         device = torch.device("cuda", 0)
-        # ngpus = torch.cuda.device_count()  # 1
-        ngpus = 1 # use 1 gpu to run the code
+        ngpus = torch.cuda.device_count()  # 1
+        # ngpus = 1 # use 1 gpu to run the code
         print("Using {} GPU(s)...".format(ngpus))
     else:
         device = torch.device("cpu")
@@ -855,8 +856,8 @@ if __name__ == "__main__":
             print([S_i.detach().cpu().tolist() for S_i in lS_indices])
             print(target.detach().cpu().numpy())
 
-    # ndevices = min(ngpus, args.mini_batch_size, num_fea - 1) if use_gpu else -1
-    ndevices = 1 if use_gpu else -1 # use single gpu to run the code
+    ndevices = min(ngpus, args.mini_batch_size, num_fea - 1) if use_gpu else -1
+    # ndevices = 1 if use_gpu else -1 # use single gpu to run the code
 
     ### construct the neural network specified above ###
     # WARNING: to obtain exactly the same initialization for
@@ -1162,12 +1163,13 @@ if __name__ == "__main__":
                     )
                     summaryWriter.add_scalar("train/loss", g_loss, iter_num)
                     summaryWriter.add_scalar("train/accuracy", g_accuracy, iter_num)
-                    summaryWriter.add_histogram("train/emb0_weight_hist", dlrm.emb_l[0].hashed_weight, iter_num)
-                    summaryWriter.add_scalar("train/emb0_weight_min", dlrm.emb_l[0].hashed_weight.min().item(), iter_num)
-                    summaryWriter.add_scalar("train/emb0_weight_max", dlrm.emb_l[0].hashed_weight.max().item(), iter_num)
-                    summaryWriter.add_scalar("train/emb0_weight_mean", dlrm.emb_l[0].hashed_weight.mean().item(), iter_num)
-                    diff = dlrm.emb_l[0].hashed_weight.data != dlrm.emb_l[1].hashed_weight.data
-                    print("Num of different numbers between emb0's weights and emb1's weights: ", diff.sum().item())
+                    if dlrm.rand_hash_emb_flag:
+                        summaryWriter.add_histogram("train/emb0_weight_hist", dlrm.emb_l[0].hashed_weight, iter_num)
+                        summaryWriter.add_scalar("train/emb0_weight_min", dlrm.emb_l[0].hashed_weight.min().item(), iter_num)
+                        summaryWriter.add_scalar("train/emb0_weight_max", dlrm.emb_l[0].hashed_weight.max().item(), iter_num)
+                        summaryWriter.add_scalar("train/emb0_weight_mean", dlrm.emb_l[0].hashed_weight.mean().item(), iter_num)
+                    # diff = dlrm.emb_l[0].hashed_weight.data != dlrm.emb_l[1].hashed_weight.data
+                    # print("ID of embedding hashed_weight: ", id(dlrm.emb_l[0].hashed_weight) == id(dlrm.emb_l[1].hashed_weight), diff.sum(), id(dlrm.emb_l[0].hashed_weight), id(dlrm.emb_l[1].hashed_weight), id(dlrm.emb_l[2].hashed_weight))
 
                     # Uncomment the line below to print out the total time with overhead
                     # print("Accumulated time so far: {}" \
