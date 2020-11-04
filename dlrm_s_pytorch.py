@@ -86,9 +86,10 @@ from tricks.qr_embedding_bag import QREmbeddingBag
 # mixed-dimension trick
 from tricks.md_embedding_bag import PrEmbeddingBag, md_solver
 from tricks.hash_embedding_bag import HashEmbeddingBag
+from tricks.hash_vector_embedding_bag import HashVectorEmbeddingBag
 import hashedEmbeddingBag
-from tricks.lsh_pretraining import getMinHashTable
-from tricks.lsh_embedding_bag import LshEmbeddingBag
+from tricks.lsh_pretraining import getMinHashTable, getBigMinHashTable
+from tricks.lsh_embedding_bag import LshEmbeddingBag, LshEmbeddingBigBag
 import os
 #from torchvision import models
 # from torchsummary import summary
@@ -187,10 +188,16 @@ class DLRM_Net(nn.Module):
     #   2. Try the LSH trick to create embeddings. Something like smartHashingEmbeddingBag(n, m, mode="sum", sparse=True).
     #       -> need pre process to make the n smaller
     def create_emb(self, m, ln):
-        # if not self.md_flag and self.rand_hash_emb_flag:
-        #     self.hashed_weight = nn.Parameter(torch.from_numpy(np.random.uniform(
-        #             low=-np.sqrt(1 / max(ln)), high=np.sqrt(1 / max(ln)), size=((int(sum(ln) * m * self.rand_hash_compression_rate),))
-        #     ).astype(np.float32)))
+        if not self.md_flag:
+            if self.rand_hash_emb_flag:
+                self.hashed_weight = nn.Parameter(torch.from_numpy(np.random.uniform(
+                        low=-np.sqrt(1 / max(ln)), high=np.sqrt(1 / max(ln)), size=((int(sum(ln) * m * self.rand_hash_compression_rate),))
+                ).astype(np.float32)))
+            elif self.lsh_emb_flag:
+                self.hashed_weight = nn.Parameter(torch.from_numpy(np.random.uniform(
+                        low=-np.sqrt(1 / max(ln)), high=np.sqrt(1 / max(ln)), size=((int(sum(ln) * m * self.lsh_emb_compression_rate),))
+                ).astype(np.float32)))
+        val_idx_offset = 0
 
         emb_l = nn.ModuleList()
         for i in range(0, ln.size):
@@ -213,9 +220,9 @@ class DLRM_Net(nn.Module):
 
             elif self.rand_hash_emb_flag:
                 lens = tuple(ln)
-                # EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, lens=lens, mode="sum") # , _weight=self.hashed_weight
+                EE = HashVectorEmbeddingBag(n, m, self.rand_hash_compression_rate, mode="sum") # , _weight=self.hashed_weight
 
-                EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, self.rand_hash_compression_rate, "sum")
+                # EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, self.rand_hash_compression_rate, "sum")
                 # if lens:
                 #     W = np.random.uniform(
                 #         low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=((int(sum(lens) * m * self.rand_hash_compression_rate), ))
@@ -228,19 +235,21 @@ class DLRM_Net(nn.Module):
                 # EE.hashed_weight.data = torch.tensor(W, requires_grad=True)
 
             elif self.lsh_emb_flag:
-                if not os.path.exists('./input/minHashTables.npz') :
-                    print("Generating minhash tables...")
-                    getMinHashTable()
-                
-                min_hash_table = torch.as_tensor(np.load('./input/minHashTables.npz')['arr_'+str(i)])
+                if not os.path.exists('./input/bigMinHashTable.npz') :
+                    print("Generating minhash table...")
+                    getBigMinHashTable()
+                counts = np.load('./input/cat_counts.npz')['cat_counts']
+                min_hash_table = torch.as_tensor(np.load('./input/bigMinHashTable.npz')['big_min_hash_table'])
                 print("Generating lsh embedding, rate: ", self.lsh_emb_compression_rate)
-                EE = LshEmbeddingBag(min_hash_table, self.lsh_emb_compression_rate, mode="sum")
+                EE = LshEmbeddingBigBag(min_hash_table, self.lsh_emb_compression_rate, "sum", self.hashed_weight, val_idx_offset)
+                
+                val_idx_offset += counts[i]
+                
+                # W = np.random.uniform(
+                #     low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=((int(n * m * self.rand_hash_compression_rate), ))
+                # ).astype(np.float32)
 
-                W = np.random.uniform(
-                    low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=((int(n * m * self.rand_hash_compression_rate), ))
-                ).astype(np.float32)
-
-                EE.hashed_weight.data = torch.tensor(W, requires_grad=True)
+                # EE.hashed_weight.data = torch.tensor(W, requires_grad=True)
 
             else:
                 EE = nn.EmbeddingBag(n, m, mode="sum", sparse=False)
@@ -324,10 +333,11 @@ class DLRM_Net(nn.Module):
             self.lsh_emb_compression_rate = lsh_emb_compression_rate
 
             if self.rand_hash_emb_flag:
-                # self.hashed_weight = None
+                self.hashed_weight = None
                 print("++++++++++ Using Random Hash Embedding! Compression rate is: ", self.rand_hash_compression_rate, "++++++++++")
 
             if self.lsh_emb_flag:
+                self.hashed_weight = None
                 print("++++++++++ Using LSH Embedding! Compression rate is: ", self.lsh_emb_compression_rate, "++++++++++")
             
             if not self.qr_flag and not self.md_flag and not self.rand_hash_emb_flag and not self.lsh_emb_flag:
@@ -699,8 +709,8 @@ if __name__ == "__main__":
         torch.cuda.manual_seed_all(args.numpy_rand_seed)
         torch.backends.cudnn.deterministic = True
         device = torch.device("cuda", 0)
-        ngpus = torch.cuda.device_count()  # 1
-        # ngpus = 1 # use 1 gpu to run the code
+        # ngpus = torch.cuda.device_count()  # 1
+        ngpus = 1 # use 1 gpu to run the code
         print("Using {} GPU(s)...".format(ngpus))
     else:
         device = torch.device("cpu")
@@ -856,8 +866,8 @@ if __name__ == "__main__":
             print([S_i.detach().cpu().tolist() for S_i in lS_indices])
             print(target.detach().cpu().numpy())
 
-    ndevices = min(ngpus, args.mini_batch_size, num_fea - 1) if use_gpu else -1
-    # ndevices = 1 if use_gpu else -1 # use single gpu to run the code
+    # ndevices = min(ngpus, args.mini_batch_size, num_fea - 1) if use_gpu else -1
+    ndevices = 1 if use_gpu else -1 # use single gpu to run the code
 
     ### construct the neural network specified above ###
     # WARNING: to obtain exactly the same initialization for
