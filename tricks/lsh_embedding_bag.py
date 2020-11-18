@@ -171,7 +171,6 @@ class LshEmbeddingBigBag(nn.Module):
         self._minhash_table = self._minhash_table.cpu().detach()
         num_embeddings = self._minhash_table.size(0)
         self.embedding_dim = self._minhash_table.size(1)
-
         # self.lsh_weight_size = math.ceil(num_embeddings * self.embedding_dim * compression)
         # self.hashed_weight = Parameter(torch.Tensor(self.lsh_weight_size))
         self.hashed_weight = _weight
@@ -180,6 +179,7 @@ class LshEmbeddingBigBag(nn.Module):
         # print("weight(embedding table): ", self.hashed_weight)
         assert (mode in ["sum", "mean"])
         self._mode = mode
+        print("LSH embedding bag, weight id: ", id(self.hashed_weight))
 
     def forward(self,
                 indices: torch.LongTensor,
@@ -227,7 +227,7 @@ class LshEmbeddingBigBag(nn.Module):
         num_bags = offsets.size(0)
 
         # get the min-hash for each category value, note that lsh_weight_index is in cpu memory
-        lsh_weight_index = self._minhash_table[indices]
+        lsh_weight_index = self._minhash_table[indices] % self.lsh_weight_size
         # print("In forward: ", lsh_weight_index, indices, self._minhash_table[indices], self.lsh_weight_size)
 
         # move the min-hash values to target device

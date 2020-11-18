@@ -86,7 +86,8 @@ from tricks.qr_embedding_bag import QREmbeddingBag
 # mixed-dimension trick
 from tricks.md_embedding_bag import PrEmbeddingBag, md_solver
 from tricks.hash_embedding_bag import HashEmbeddingBag
-from tricks.hash_vector_embedding_bag import HashVectorEmbeddingBag
+from tricks.hash_embedding_bag_multi_update import HashEmbeddingBagMultiUpdate
+from tricks.hash_vector_embedding_bag import HashVectorEmbeddingBag, MultiUpdateHashVectorEmbeddingBag
 import hashedEmbeddingBag
 from tricks.lsh_pretraining import getMinHashTable, getBigMinHashTable
 from tricks.lsh_embedding_bag import LshEmbeddingBag, LshEmbeddingBigBag
@@ -188,7 +189,8 @@ class DLRM_Net(nn.Module):
     #   2. Try the LSH trick to create embeddings. Something like smartHashingEmbeddingBag(n, m, mode="sum", sparse=True).
     #       -> need pre process to make the n smaller
     def create_emb(self, m, ln):
-        if not self.md_flag:
+        big_shared_weight = False
+        if not self.md_flag and not self.qr_flag and big_shared_weight:
             if self.rand_hash_emb_flag:
                 self.hashed_weight = nn.Parameter(torch.from_numpy(np.random.uniform(
                         low=-np.sqrt(1 / max(ln)), high=np.sqrt(1 / max(ln)), size=((int(sum(ln) * m * self.rand_hash_compression_rate),))
@@ -219,19 +221,15 @@ class DLRM_Net(nn.Module):
                 EE.embs.weight.data = torch.tensor(W, requires_grad=True)
 
             elif self.rand_hash_emb_flag:
-                lens = tuple(ln)
-                EE = HashVectorEmbeddingBag(n, m, self.rand_hash_compression_rate, mode="sum") # , _weight=self.hashed_weight
-
+                # EE = HashVectorEmbeddingBag(n, m) # vector map, rate = 1.0
+                # EE = MultiUpdateHashVectorEmbeddingBag(n, m, 1.0, 8)
+                EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, mode="sum")
+                # EE = HashEmbeddingBagMultiUpdate(n, m, self.rand_hash_compression_rate, update_count=2, mode="sum", _weight=self.hashed_weight) # 
                 # EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, self.rand_hash_compression_rate, "sum")
-                # if lens:
-                #     W = np.random.uniform(
-                #         low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=((int(sum(lens) * m * self.rand_hash_compression_rate), ))
-                #     ).astype(np.float32)
-                # else:
-                #     W = np.random.uniform(
-                #         low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=((int(n * m * self.rand_hash_compression_rate), ))
-                #     ).astype(np.float32)
 
+                # W = np.random.uniform(
+                #     low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=((int(n * m * self.rand_hash_compression_rate), ))
+                #     ).astype(np.float32)
                 # EE.hashed_weight.data = torch.tensor(W, requires_grad=True)
 
             elif self.lsh_emb_flag:
@@ -709,8 +707,8 @@ if __name__ == "__main__":
         torch.cuda.manual_seed_all(args.numpy_rand_seed)
         torch.backends.cudnn.deterministic = True
         device = torch.device("cuda", 0)
-        # ngpus = torch.cuda.device_count()  # 1
-        ngpus = 1 # use 1 gpu to run the code
+        ngpus = torch.cuda.device_count()
+        # ngpus = 1 # use 1 gpu to run the code
         print("Using {} GPU(s)...".format(ngpus))
     else:
         device = torch.device("cpu")
@@ -866,8 +864,8 @@ if __name__ == "__main__":
             print([S_i.detach().cpu().tolist() for S_i in lS_indices])
             print(target.detach().cpu().numpy())
 
-    # ndevices = min(ngpus, args.mini_batch_size, num_fea - 1) if use_gpu else -1
-    ndevices = 1 if use_gpu else -1 # use single gpu to run the code
+    ndevices = min(ngpus, args.mini_batch_size, num_fea - 1) if use_gpu else -1
+    # ndevices = 1 if use_gpu else -1 # use single gpu to run the code
 
     ### construct the neural network specified above ###
     # WARNING: to obtain exactly the same initialization for

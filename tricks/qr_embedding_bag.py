@@ -154,7 +154,7 @@ class QREmbeddingBag(nn.Module):
         nn.init.uniform_(self.weight_r, np.sqrt(1 / self.num_categories))
 
     def forward(self, input, offsets=None, per_sample_weights=None):
-        input_q = (input / self.num_collisions).long()
+        input_q = torch.true_divide(input, self.num_collisions).long()
         input_r = torch.remainder(input, self.num_collisions).long()
 
         embed_q = F.embedding_bag(input_q, self.weight_q, offsets, self.max_norm,
