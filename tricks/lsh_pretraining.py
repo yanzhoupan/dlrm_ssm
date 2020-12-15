@@ -24,12 +24,13 @@ def getMinHashTable():
         cat_fea = data['X_cat'][:, fea_id]
         for doc_id in range(len(cat_fea)):
             val_indices[cat_fea[doc_id]].append(doc_id)
-        # print(len(val_indices), len(cat_fea))
+        
+        # TODO: transform val_indices to a sparse vector (val_sp) in pytorch
 
-        min_hash_gen = SparseBitVectorMinHashGenerator(len(cat_fea), 16)
+        min_hash_gen = SparseBitVectorMinHashGenerator(len(cat_fea), 16) 
         min_hash_table = []
         for val_id in range(len(val_indices)):
-            min_hash_table.append(min_hash_gen.generate(val_indices[val_id]))
+            min_hash_table.append(min_hash_gen.generate(val_indices[val_id])) # TODO: use val_sp as the input to generate
         min_hash_tables.append(min_hash_table)
 
     np.savez(r'./input/minHashTables.npz', *min_hash_tables)
@@ -57,7 +58,8 @@ def getBigMinHashTable():
     
     min_hash_table = []
     # print(len(cat_fea))
-    min_hash_gen = SparseBitVectorMinHashGenerator(len(cat_fea), 16)
+    embedding_dim = 16
+    min_hash_gen = SparseBitVectorMinHashGenerator(len(cat_fea), embedding_dim, 2)
     for val_id in range(len(val_indices)):
         min_hash_table.append(min_hash_gen.generate(val_indices[val_id]))
 

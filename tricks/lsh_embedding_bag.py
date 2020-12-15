@@ -46,6 +46,7 @@ class LshEmbeddingBag(nn.Module):
         self.embedding_dim = self._minhash_table.size(1)
 
         self.lsh_weight_size = math.ceil(num_embeddings * self.embedding_dim * compression)
+        print("LSH weight size: ", self.lsh_weight_size)
         self.hashed_weight = Parameter(torch.Tensor(self.lsh_weight_size))
         # print("weight(embedding table): ", self.hashed_weight)
         assert (mode in ["sum", "mean"])
@@ -197,7 +198,7 @@ class LshEmbeddingBigBag(nn.Module):
         """
 
         # always move indices to cpu, as we need to get its corresponding minhash values from table in memory
-        indices = indices.cpu()
+        # indices = indices.cpu()
         indices += self.val_idx_offset
 
         # Check input validation.
@@ -228,23 +229,21 @@ class LshEmbeddingBigBag(nn.Module):
 
         # get the min-hash for each category value, note that lsh_weight_index is in cpu memory
         lsh_weight_index = self._minhash_table[indices] % self.lsh_weight_size
-        # print("In forward: ", lsh_weight_index, indices, self._minhash_table[indices], self.lsh_weight_size)
 
         # move the min-hash values to target device
-        lsh_weight_index = lsh_weight_index.to(self.hashed_weight.device)
+        # lsh_weight_index = lsh_weight_index.to(self.hashed_weight.device)
         lsh_weight_index %= self.lsh_weight_size
 
         # indices_embedding_vector is a |indices| x |embedding_dim| tensor.
         indices_embedding_vectors = self.hashed_weight[lsh_weight_index]
-        # print('indices_embedding_vectors: ', lsh_weight_index, indices_embedding_vectors)
 
         # multiply embedding vectors by weights
         if per_index_weights is not None:
-            per_index_weights = per_index_weights.to(indices_embedding_vectors.device)
+            # per_index_weights = per_index_weights.to(indices_embedding_vectors.device)
             indices_embedding_vectors *= per_index_weights[:, None]
-        # print("per_index_weights",per_index_weights)
+
         offsets2bag = make_offset2bag(offsets, indices)
-        # print("offsets2bag: ", offsets2bag)
+
         if self._mode == "sum" or self._mode == "mean":
             result = \
                 torch.zeros(num_bags, self.embedding_dim, dtype=indices_embedding_vectors.dtype,

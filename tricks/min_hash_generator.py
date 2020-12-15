@@ -8,13 +8,20 @@ import xxhash
 class SparseBitVectorMinHashGenerator:
     def __init__(self,
                  input_size,
-                 num_perm=128):
+                 num_perm=128,
+                 num_minhash=1):
         self.input_size = input_size
         self.num_perm = num_perm
+        self.num_minhash = num_minhash
         # self.permutations = [np.random.permutation(self.input_size) for _ in range(self.num_perm)]
         # self.permutation_start = np.random.randint(0, self.input_size, self.num_perm)
-        self.permutation_hashes = [self.generate_hash() for _ in range(self.num_perm)]
-        self.permutation_hashes_exp = [self.generate_hash() for _ in range(self.num_perm)]
+        
+        self.permutation_hashes = []
+        for _ in range(self.num_minhash):
+            self.permutation_hashes.append([self.generate_hash() for _ in range(self.num_perm)])
+
+        # self.permutation_hashes = [self.generate_hash() for _ in range(self.num_perm)]
+        # self.permutation_hashes_exp = [self.generate_hash() for _ in range(self.num_perm)]
 
     def generate_hash(self):
         c = nth_prime(1000000)
@@ -39,18 +46,23 @@ class SparseBitVectorMinHashGenerator:
         return result
 
     
-    def generate(self, sparse_bit_vector):
+    def generate(self, sparse_bit_vector): # TODO: sparse_bit_vector becomes val_sp (torch sparse vector) and use sparse_matmul()
         result = np.full(self.num_perm, self.input_size, dtype=np.int)
-        result_ext = np.full(self.num_perm, self.input_size, dtype=np.int)
+        results = []
+        for _ in range(self.num_minhash):
+            results.append(np.full(self.num_perm, self.input_size, dtype=np.int))
+        
         for r in sparse_bit_vector:
             for i in range(self.num_perm):
-                hashed_value = self.permutation_hashes[i](r)
-                result[i] = min(result[i], hashed_value)
-                hashed_value_ext = self.permutation_hashes_exp[i](r)
-                result_ext[i] = min(result_ext[i], hashed_value_ext)
+                for hash_idx in range(self.num_minhash):
+                    hashed_value = self.permutation_hashes[hash_idx][i](r)
+                    results[hash_idx][i] = min(results[hash_idx][i], hashed_value)
         
         for i in range(self.num_perm):
-            key = '{}_{}_{}'.format(result[i], result_ext[i], 'minHash')
+            key = ""
+            for hash_idx in range(self.num_minhash):
+                key += str(results[hash_idx][i]) + "_"
+            key += "minhash"
             result[i] = xxhash.xxh32(key, 2).intdigest()
         return result
 

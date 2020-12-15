@@ -189,7 +189,7 @@ class DLRM_Net(nn.Module):
     #   2. Try the LSH trick to create embeddings. Something like smartHashingEmbeddingBag(n, m, mode="sum", sparse=True).
     #       -> need pre process to make the n smaller
     def create_emb(self, m, ln):
-        big_shared_weight = False
+        big_shared_weight = True
         if not self.md_flag and not self.qr_flag and big_shared_weight:
             if self.rand_hash_emb_flag:
                 self.hashed_weight = nn.Parameter(torch.from_numpy(np.random.uniform(
@@ -202,6 +202,16 @@ class DLRM_Net(nn.Module):
         val_idx_offset = 0
 
         emb_l = nn.ModuleList()
+
+        if self.lsh_emb_flag:
+            if not os.path.exists('./input/bigMinHashTable.npz') :
+                print("Generating minhash table...")
+                getBigMinHashTable()
+            counts = np.load('./input/cat_counts.npz')['cat_counts']
+            min_hash_table = torch.as_tensor(np.load('./input/bigMinHashTable.npz')['big_min_hash_table'])
+            min_hash_table = min_hash_table.cuda()
+            print("Minhash table memory device: ", min_hash_table.device)
+
         for i in range(0, ln.size):
             n = ln[i]
             # print("Number of unique cat values", ln)
@@ -223,9 +233,9 @@ class DLRM_Net(nn.Module):
             elif self.rand_hash_emb_flag:
                 # EE = HashVectorEmbeddingBag(n, m) # vector map, rate = 1.0
                 # EE = MultiUpdateHashVectorEmbeddingBag(n, m, 1.0, 8)
-                EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, mode="sum")
+                # EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, mode="sum")
                 # EE = HashEmbeddingBagMultiUpdate(n, m, self.rand_hash_compression_rate, update_count=2, mode="sum", _weight=self.hashed_weight) # 
-                # EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, self.rand_hash_compression_rate, "sum")
+                EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, self.rand_hash_compression_rate, "sum")
 
                 # W = np.random.uniform(
                 #     low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=((int(n * m * self.rand_hash_compression_rate), ))
@@ -233,11 +243,7 @@ class DLRM_Net(nn.Module):
                 # EE.hashed_weight.data = torch.tensor(W, requires_grad=True)
 
             elif self.lsh_emb_flag:
-                if not os.path.exists('./input/bigMinHashTable.npz') :
-                    print("Generating minhash table...")
-                    getBigMinHashTable()
-                counts = np.load('./input/cat_counts.npz')['cat_counts']
-                min_hash_table = torch.as_tensor(np.load('./input/bigMinHashTable.npz')['big_min_hash_table'])
+                # min_hash_table = min_hash_table.to(self.hashed_weight.device)
                 print("Generating lsh embedding, rate: ", self.lsh_emb_compression_rate)
                 EE = LshEmbeddingBigBag(min_hash_table, self.lsh_emb_compression_rate, "sum", self.hashed_weight, val_idx_offset)
                 
@@ -251,7 +257,7 @@ class DLRM_Net(nn.Module):
 
             else:
                 EE = nn.EmbeddingBag(n, m, mode="sum", sparse=False)
-
+                print("Generating original embedding...")
                 # initialize embeddings
                 # nn.init.uniform_(EE.weight, a=-np.sqrt(1 / n), b=np.sqrt(1 / n))
                 W = np.random.uniform(
@@ -943,7 +949,8 @@ if __name__ == "__main__":
             print(name,':',parameters.size())
             total_para += parameters.numel()
         print("+++++++++ Total parameter cnt: ", total_para, "+++++++++")
-        optimizer = torch.optim.SGD(dlrm.parameters(), lr=args.learning_rate)
+        # optimizer = torch.optim.SGD(dlrm.parameters(), lr=args.learning_rate)
+        optimizer = torch.optim.Adam(dlrm.parameters(), lr=args.learning_rate, weight_decay=5e-6)
         lr_scheduler = LRPolicyScheduler(optimizer, args.lr_num_warmup_steps, args.lr_decay_start_step,
                                          args.lr_num_decay_steps)
 
