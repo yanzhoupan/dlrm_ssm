@@ -6,37 +6,30 @@ from collections import defaultdict
 # import multiprocessing
 from tqdm import tqdm
 import time
-# from p_tqdm import p_map
 
-# cores = multiprocessing.cpu_count()
-# pool = multiprocessing.Pool(processes=cores)
-# print(cores)
-
-def getMinHashTable():
-    data = np.load('./input/kaggleAdDisplayChallenge_processed.npz')
-    min_hash_tables = []
-    start = time.time()
-    cat_num = len(data["X_cat"][0]) # 26
-    # print()
-    for fea_id in tqdm(range(cat_num)):
+# def getMinHashTable():
+#     data = np.load('./input/kaggleAdDisplayChallenge_processed.npz')
+#     min_hash_tables = []
+#     start = time.time()
+#     cat_num = len(data["X_cat"][0]) # 26
+#     # print()
+#     for fea_id in tqdm(range(cat_num)):
   
-        val_indices = defaultdict(lambda:[])
-        cat_fea = data['X_cat'][:, fea_id]
-        for doc_id in range(len(cat_fea)):
-            val_indices[cat_fea[doc_id]].append(doc_id)
-        
-        # TODO: transform val_indices to a sparse vector (val_sp) in pytorch
+#         val_indices = defaultdict(lambda:[])
+#         cat_fea = data['X_cat'][:, fea_id]
+#         for doc_id in range(len(cat_fea)):
+#             val_indices[cat_fea[doc_id]].append(doc_id)
 
-        min_hash_gen = SparseBitVectorMinHashGenerator(len(cat_fea), 16) 
-        min_hash_table = []
-        for val_id in range(len(val_indices)):
-            min_hash_table.append(min_hash_gen.generate(val_indices[val_id])) # TODO: use val_sp as the input to generate
-        min_hash_tables.append(min_hash_table)
+#         min_hash_gen = SparseBitVectorMinHashGenerator(len(cat_fea), 16) 
+#         min_hash_table = []
+#         for val_id in range(len(val_indices)):
+#             min_hash_table.append(min_hash_gen.generate(val_indices[val_id])) # TODO: use val_sp as the input to generate
+#         min_hash_tables.append(min_hash_table)
 
-    np.savez(r'./input/minHashTables.npz', *min_hash_tables)
+#     np.savez(r'./input/minHashTables.npz', *min_hash_tables)
 
-    end = time.time()
-    print(end - start)
+#     end = time.time()
+#     print(end - start)
 
 
 def getBigMinHashTable():
@@ -57,9 +50,9 @@ def getBigMinHashTable():
         base += data['counts'][fea_id]
     
     min_hash_table = []
-    # print(len(cat_fea))
     embedding_dim = 16
-    min_hash_gen = SparseBitVectorMinHashGenerator(len(cat_fea), embedding_dim, 2)
+    input_size = len(cat_fea) # number of the data items
+    min_hash_gen = SparseBitVectorMinHashGenerator(input_size, embedding_dim, 2)
     for val_id in range(len(val_indices)):
         min_hash_table.append(min_hash_gen.generate(val_indices[val_id]))
 

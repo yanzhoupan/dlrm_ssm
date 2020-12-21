@@ -89,7 +89,7 @@ from tricks.hash_embedding_bag import HashEmbeddingBag
 from tricks.hash_embedding_bag_multi_update import HashEmbeddingBagMultiUpdate
 from tricks.hash_vector_embedding_bag import HashVectorEmbeddingBag, MultiUpdateHashVectorEmbeddingBag
 import hashedEmbeddingBag
-from tricks.lsh_pretraining import getMinHashTable, getBigMinHashTable
+from tricks.lsh_pretraining import getBigMinHashTable
 from tricks.lsh_embedding_bag import LshEmbeddingBag, LshEmbeddingBigBag
 import os
 #from torchvision import models
@@ -949,8 +949,8 @@ if __name__ == "__main__":
             print(name,':',parameters.size())
             total_para += parameters.numel()
         print("+++++++++ Total parameter cnt: ", total_para, "+++++++++")
-        # optimizer = torch.optim.SGD(dlrm.parameters(), lr=args.learning_rate)
-        optimizer = torch.optim.Adam(dlrm.parameters(), lr=args.learning_rate, weight_decay=5e-6)
+        optimizer = torch.optim.SGD(dlrm.parameters(), lr=args.learning_rate)
+        # optimizer = torch.optim.Adam(dlrm.parameters(), lr=args.learning_rate, weight_decay=5e-6)
         lr_scheduler = LRPolicyScheduler(optimizer, args.lr_num_warmup_steps, args.lr_decay_start_step,
                                          args.lr_num_decay_steps)
 
