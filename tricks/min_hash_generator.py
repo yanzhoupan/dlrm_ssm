@@ -21,10 +21,13 @@ class SparseBitVectorMinHashGenerator:
         #    self.permutation_hashes.append([self.generate_hash() for _ in range(self.num_perm)])
 
         self.A1s, self.A2s, self.A3s = [], [], []
+
         for _ in range(self.num_minhash):
-            self.A1s.append(torch.randint(0, input_size, torch.Size((1, self.num_perm))))
-            self.A2s.append(torch.randint(0, input_size, torch.Size((1, self.num_perm))))
-            self.A3s.append(torch.randint(0, input_size, torch.Size((1, self.num_perm))))
+            self.A1s.append(torch.randint(0, nth_prime(1000000), torch.Size((1, self.num_perm))))
+            self.A2s.append(torch.randint(0, nth_prime(1000000), torch.Size((1, self.num_perm))))
+            self.A3s.append(torch.randint(0, nth_prime(1000000), torch.Size((1, self.num_perm))))
+
+        self.A4s = torch.randint(1, nth_prime(1000000), torch.Size((1, self.num_minhash)))
         
         # self.permutation_hashes = [self.generate_hash() for _ in range(self.num_perm)]
         # self.permutation_hashes_exp = [self.generate_hash() for _ in range(self.num_perm)]
@@ -77,7 +80,7 @@ class SparseBitVectorMinHashGenerator:
         sparse_bit_vector = torch.LongTensor(sparse_bit_vector)
         sparse_bit_vector = sparse_bit_vector.reshape(sparse_bit_vector.size(0), 1)
         result = sparse_bit_vector + 1
-
+        
         result = torch.matmul(result, self.A1s[0]) + \
                         torch.matmul(torch.square(result), self.A2s[0]) + \
                         torch.matmul(torch.pow(result, 3), self.A3s[0])
@@ -91,8 +94,7 @@ class SparseBitVectorMinHashGenerator:
         sparse_bit_vector = torch.LongTensor(sparse_bit_vector)
         sparse_bit_vector = sparse_bit_vector.reshape(sparse_bit_vector.size(0), 1)
         vector = sparse_bit_vector + 1
-        result = np.full(self.num_perm, 1, dtype=np.int)
-
+        # result = np.full(self.num_perm, 1, dtype=np.int)
         results = []
         for i in range(self.num_minhash):
             x = torch.matmul(vector, self.A1s[i]) + \
@@ -103,13 +105,15 @@ class SparseBitVectorMinHashGenerator:
 
             results.append(x)
 
-        for i in range(self.num_perm):
-            key = ""
-            for hash_idx in range(self.num_minhash):
-                key += str(results[hash_idx][i]) + "_"
-            key += "minhash"
-            result[i] = xxhash.xxh32(key, 2).intdigest()
-        return result
+        return torch.matmul(self.A4s, torch.stack(results, 0))[0].data.numpy()
+
+        # for i in range(self.num_perm):
+        #     key = ""
+        #     for hash_idx in range(self.num_minhash):
+        #         key += str(results[hash_idx][i]) + "_"
+        #     key += "minhash"
+        #     result[i] = xxhash.xxh32(key, 2).intdigest()
+        # return result
 
 
 
