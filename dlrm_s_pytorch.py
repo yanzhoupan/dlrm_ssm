@@ -209,8 +209,8 @@ class DLRM_Net(nn.Module):
                 getBigMinHashTable()
             counts = np.load('./input/cat_counts.npz')['cat_counts']
             min_hash_table = torch.as_tensor(np.load('./input/bigMinHashTable.npz')['big_min_hash_table'])
-            min_hash_table = min_hash_table.cuda()
-            print("Minhash table memory device: ", min_hash_table.device)
+            min_hash_table = min_hash_table.cpu()
+            # print("Minhash table memory device: ", min_hash_table.device)
 
         for i in range(0, ln.size):
             n = ln[i]
@@ -233,14 +233,11 @@ class DLRM_Net(nn.Module):
             elif self.rand_hash_emb_flag:
                 # EE = HashVectorEmbeddingBag(n, m) # vector map, rate = 1.0
                 # EE = MultiUpdateHashVectorEmbeddingBag(n, m, 1.0, 8)
+                EE = HashEmbeddingBag(n, m, _weight=self.hashed_weight, mode="sum")
                 # EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, mode="sum")
-                # EE = HashEmbeddingBagMultiUpdate(n, m, self.rand_hash_compression_rate, update_count=2, mode="sum", _weight=self.hashed_weight) # 
-                EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, self.rand_hash_compression_rate, "sum")
 
-                # W = np.random.uniform(
-                #     low=-np.sqrt(1 / n), high=np.sqrt(1 / n), size=((int(n * m * self.rand_hash_compression_rate), ))
-                #     ).astype(np.float32)
-                # EE.hashed_weight.data = torch.tensor(W, requires_grad=True)
+                # EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, self.rand_hash_compression_rate, "sum")
+
 
             elif self.lsh_emb_flag:
                 # min_hash_table = min_hash_table.to(self.hashed_weight.device)
@@ -382,8 +379,7 @@ class DLRM_Net(nn.Module):
             V = E(sparse_index_group_batch, sparse_offset_group_batch)
 
             ly.append(V)
-
-        # print(ly)
+            
         return ly
 
     def interact_features(self, x, ly):

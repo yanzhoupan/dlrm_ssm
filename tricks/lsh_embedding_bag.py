@@ -151,6 +151,8 @@ def lshEmbeddingBagTest():
     test_per_sample_weight = torch.DoubleTensor([2, 3, 2, 3, 2]).cuda()
     # print(embedding_bag.forward(test_indices, test_offset, test_per_sample_weight))
 
+
+
 class LshEmbeddingBigBag(nn.Module):
 
     def __init__(self, minhash_table: torch.LongTensor, compression=1.0, mode="sum", _weight=None, val_idx_offset=0):
