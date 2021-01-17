@@ -76,17 +76,17 @@ class HashEmbeddingBag(nn.Module):
         This is a determinestic hash function
         '''
 
-        a, b, c, d= 32452843, 86028121, 15485863, 512927357
-        mat1 = torch.arange(0, size_out, out=torch.LongTensor()).repeat(size_in, 1).t()
-        mat2 = torch.arange(0, size_in, out=torch.LongTensor()).repeat(size_out, 1)
-        idx_mat = (( mat1 * a + mat2 * b + c) % d) % hN
-        return idx_mat
+        # a, b, c, d= 32452843, 86028121, 15485863, 512927357
+        # mat1 = torch.arange(0, size_out, out=torch.LongTensor()).repeat(size_in, 1).t()
+        # mat2 = torch.arange(0, size_in, out=torch.LongTensor()).repeat(size_out, 1)
+        # idx_mat = (( mat1 * a + mat2 * b + c) % d) % hN
+        # return idx_mat
 
-        # idx = torch.LongTensor(size_out, size_in)
-        # for i in range(size_out):
-        #     for j in range(size_in):
-        #         idx[i, j] = ((i * 32452843 + j * 86028121 + 15485863) % 512927357) % hN
-        # return idx
+        idx = torch.LongTensor(size_out, size_in)
+        for i in range(size_out):
+            for j in range(size_in):
+                idx[i, j] = ((i * 32452843 + j * 86028121 + 15485863) % 512927357) % hN
+        return idx
 
     
     def cantor_pairing_hash_func(self, hN, size_out, size_in, extra_str=''):

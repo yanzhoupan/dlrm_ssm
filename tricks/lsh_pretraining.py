@@ -95,13 +95,13 @@ def getBigMinHashTable():
         base += data['counts'][fea_id]
     
     min_hash_table = []
-    embedding_dim = 512
+    embedding_dim = 128
     input_size = len(cat_fea) # number of the data items
     min_hash_gen = SparseBitVectorMinHashGenerator(input_size, embedding_dim, 2)
     for val_id in range(len(val_indices)):
         min_hash_table.append(min_hash_gen.generate(val_indices[val_id]))
 
-    np.savez(r'./input/bigMinHashTable_125k_dim512.npz', big_min_hash_table = min_hash_table)
+    np.savez(r'./input/bigMinHashTable_125k_dim128.npz', big_min_hash_table = min_hash_table)
 
     end = time.time()
     print(end - start)

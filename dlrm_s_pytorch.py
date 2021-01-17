@@ -189,8 +189,8 @@ class DLRM_Net(nn.Module):
     #   2. Try the LSH trick to create embeddings. Something like smartHashingEmbeddingBag(n, m, mode="sum", sparse=True).
     #       -> need pre process to make the n smaller
     def create_emb(self, m, ln):
-        big_shared_weight = True
-        if not self.md_flag and not self.qr_flag and big_shared_weight:
+        big_shared_weight = False
+        if (self.rand_hash_emb_flag or self.lsh_emb_flag) and big_shared_weight:
             if self.rand_hash_emb_flag:
                 self.hashed_weight = nn.Parameter(torch.from_numpy(np.random.uniform(
                         low=-np.sqrt(1 / max(ln)), high=np.sqrt(1 / max(ln)), size=((int(sum(ln) * m * self.rand_hash_compression_rate),))
@@ -233,10 +233,10 @@ class DLRM_Net(nn.Module):
             elif self.rand_hash_emb_flag:
                 # EE = HashVectorEmbeddingBag(n, m) # vector map, rate = 1.0
                 # EE = MultiUpdateHashVectorEmbeddingBag(n, m, 1.0, 8)
-                EE = HashEmbeddingBag(n, m, _weight=self.hashed_weight, mode="sum")
+                # EE = HashEmbeddingBag(n, m, _weight=self.hashed_weight, mode="sum")
                 # EE = HashEmbeddingBag(n, m, self.rand_hash_compression_rate, mode="sum")
 
-                # EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, self.rand_hash_compression_rate, "sum")
+                EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, self.rand_hash_compression_rate, "sum")
 
 
             elif self.lsh_emb_flag:
