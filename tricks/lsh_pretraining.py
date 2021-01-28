@@ -114,3 +114,12 @@ if __name__ == "__main__":
     # minHashTables = np.load('./input/minHashTables.npz')
     # print(len(minHashTables['arr_0'][:, 0]))
     # print(len(bigMinHashTable['big_min_hash_table'][:, 0]))
+
+
+# import torch
+# import numpy as np
+# min_hash_table = torch.as_tensor(np.load('./input/bigMinHashTable_125k_dim16.npz')['big_min_hash_table'])
+# min_hash_table.shape # torch.Size([33762577, 16])
+# min_hash_table = min_hash_table[:, :8]
+# min_hash_table.shape
+

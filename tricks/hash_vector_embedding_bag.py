@@ -99,7 +99,7 @@ class HashVectorEmbeddingBag(nn.Module):
         print("Using linear hash...")
         idx = torch.LongTensor(size_out)
         for i in range(size_out):
-            idx[i] = (i * size_in) % hN
+            idx[i] = (i * hN) % hN
         return idx
 
     def forward(self, x, offsets=None):
