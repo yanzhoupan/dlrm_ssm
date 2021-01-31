@@ -8,7 +8,7 @@ This project applys similarity-based shared memory(SSM) embeddings on DLRM. It i
 
 ## Implementation
 
-**DLRM PyTorch**. We only support SSM for PyTorch currently.
+**DLRM PyTorch**. Currently we only support SSM for PyTorch.
 
        dlrm_s_pytorch.py
        lsh_pp_pretraining.py
