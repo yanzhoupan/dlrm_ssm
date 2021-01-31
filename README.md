@@ -57,6 +57,8 @@ command line arguments
 |:--------------------|:---|:----|
 |lsh-emb-flag|-|enable SSM embedding for DLRM|
 |lsh-emb-compression-rate|float|1/expansion rate|
+|rand-emb-flag|-|enable HashNet embedding for DLRM|
+|rand-emb-compression-rate|float|1/expansion rate|
 |arch-sparse-feature-size|string|we use "13-512-256-128" which is the default value for DLRM|
 |arch-mlp-bot|string|we use "1024-1024-512-256-1" which is the default value for DLRM|
 |data-generation|string|"dataset" to run our code, default is "ramdom"|
@@ -74,12 +76,22 @@ command line arguments
 |test-num-workers|int|we use 16 for our experiment|
 
 
-#### A sample run of the code
+#### A sample run of DLRM with SSM ebmedding code
 A sample that runs our code is in:
 ```
 bench/dlrm_s_criteo_kaggle.sh
 ```
 
+### run HashNet embeddings with DLRM:
+#### 1. Install HashNet
+cuda-dev is a prerequest for our implementation of HashNet embeddings.
+```
+python tricks/hashedEmbeddingBag/setup.py install
+```
+will install the HashNet
+
+#### 2. Run DLRM with HashNet embedding
+Use --rand-emb-flag in bench/dlrm_s_criteo_kaggle.sh to enbale HashNet embedding, use --rand-emb-compression-rate to set your expansion rate. Other settings can stay the same as SSM embedding.
 
 ## License
 
