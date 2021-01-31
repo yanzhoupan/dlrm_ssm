@@ -13,12 +13,6 @@ class SparseBitVectorMinHashGenerator:
         self.input_size = input_size
         self.num_perm = num_perm
         self.num_minhash = num_minhash
-        # self.permutations = [np.random.permutation(self.input_size) for _ in range(self.num_perm)]
-        # self.permutation_start = np.random.randint(0, self.input_size, self.num_perm)
-        
-        #self.permutation_hashes = []
-        #for _ in range(self.num_minhash):
-        #    self.permutation_hashes.append([self.generate_hash() for _ in range(self.num_perm)])
 
         self.A1s, self.A2s, self.A3s = [], [], []
 
@@ -28,9 +22,6 @@ class SparseBitVectorMinHashGenerator:
             self.A3s.append(torch.randint(0, nth_prime(1000000), torch.Size((1, self.num_perm))))
 
         self.A4s = torch.randint(1, nth_prime(1000000), torch.Size((1, self.num_minhash)))
-        
-        # self.permutation_hashes = [self.generate_hash() for _ in range(self.num_perm)]
-        # self.permutation_hashes_exp = [self.generate_hash() for _ in range(self.num_perm)]
 
     def generate_hash(self):
         c = nth_prime(1000000)
@@ -38,57 +29,8 @@ class SparseBitVectorMinHashGenerator:
         a = nth_prime(a_idx)
         b_idx = np.random.randint(10000, 1000000)
         b = nth_prime(b_idx)
-        # c_idx = np.random.randint(10000, 1000000) # choose a large c, a and b is in range(1, c)
-        # c = nth_prime(c_idx)
         return lambda x: (a * x + b) % c % self.input_size
 
-    # def generate_old(self, sparse_bit_vector):
-    #     result = np.full(self.num_perm, self.input_size, dtype=np.int)
-    #     for r in sparse_bit_vector:
-    #         for i in range(self.num_perm):
-    #             hashed_value = self.permutation_hashes[i](r)
-    #             result[i] = min(result[i], hashed_value)
-        
-    #     for i in range(self.num_perm):
-    #         key = '{}_{}'.format(i, 'minHash')
-    #         xxhash.xxh32(key, 2).intdigest()
-    #     return result
-
-    
-    def generate_singleMatMul(self, sparse_bit_vector):
-        """
-        result = np.full(self.num_perm, self.input_size, dtype=np.int)
-        results = []
-        for _ in range(self.num_minhash):
-            results.append(np.full(self.num_perm, self.input_size, dtype=np.int))
-        
-        for r in sparse_bit_vector:
-            for i in range(self.num_perm):
-                for hash_idx in range(self.num_minhash):
-                    hashed_value = self.permutation_hashes[hash_idx][i](r)
-                    results[hash_idx][i] = min(results[hash_idx][i], hashed_value)
-        
-        for i in range(self.num_perm):
-            key = ""
-            for hash_idx in range(self.num_minhash):
-                key += str(results[hash_idx][i]) + "_"
-            key += "minhash"
-            result[i] = xxhash.xxh32(key, 2).intdigest()
-        return result
-        """
-        # print("sparse bit vector: ", sparse_bit_vector, type(sparse_bit_vector))
-        sparse_bit_vector = torch.LongTensor(sparse_bit_vector)
-        sparse_bit_vector = sparse_bit_vector.reshape(sparse_bit_vector.size(0), 1)
-        result = sparse_bit_vector + 1
-        
-        result = torch.matmul(result, self.A1s[0]) + \
-                        torch.matmul(torch.square(result), self.A2s[0]) + \
-                        torch.matmul(torch.pow(result, 3), self.A3s[0])
-        result = result % self.input_size
-        # print("result:", result)
-        result, _ = torch.min(result, axis=0)
-        # print("result:", result)
-        return result.data.numpy()
 
     def generate(self, sparse_bit_vector):
         sparse_bit_vector = torch.LongTensor(sparse_bit_vector)
@@ -106,15 +48,6 @@ class SparseBitVectorMinHashGenerator:
             results.append(x)
 
         return torch.matmul(self.A4s, torch.stack(results, 0))[0].data.numpy()
-
-        # for i in range(self.num_perm):
-        #     key = ""
-        #     for hash_idx in range(self.num_minhash):
-        #         key += str(results[hash_idx][i]) + "_"
-        #     key += "minhash"
-        #     result[i] = xxhash.xxh32(key, 2).intdigest()
-        # return result
-
 
 
 if __name__ == "__main__":
