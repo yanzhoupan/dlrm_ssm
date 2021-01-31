@@ -15,7 +15,7 @@ This project applys similarity-based shared memory(SSM) embeddings on DLRM. It i
 
 
 ## How to run our code?
-### prerequests:
+### Prerequests:
 pytorch-nightly (*6/10/19*)
 
 scikit-learn
@@ -32,7 +32,7 @@ cuda-dev(*optional*)
 
 tqdm
 
-### run SSM embeddings with DLRM:
+### Run SSM embeddings with DLRM:
 #### 1. Pre-training
 Use tricks/lsh_pp_pretraining.py to generate the min_hash_table for SSM embeddings. 3 hyperparameter is needed：
 
@@ -82,7 +82,7 @@ A sample that runs our code is in:
 bench/dlrm_s_criteo_kaggle.sh
 ```
 
-### run HashNet embeddings with DLRM:
+### Run HashNet embeddings with DLRM:
 #### 1. Install HashNet
 cuda-dev is a prerequest for our implementation of HashNet embeddings.
 ```
