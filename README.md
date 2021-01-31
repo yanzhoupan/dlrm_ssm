@@ -59,7 +59,7 @@ command line arguments
 |lsh-emb-compression-rate|float|1/expansion rate|
 |arch-sparse-feature-size|string|we use "13-512-256-128" which is the default value for DLRM|
 |arch-mlp-bot|string|we use "1024-1024-512-256-1" which is the default value for DLRM|
-|data-generation|string|please use "dataset" to run our code|
+|data-generation|string|"dataset" to run our code, default is "ramdom"|
 |data-set|string|please use "kaggle" to run our code|
 |raw-data-file|string|please use "./input/train.txt" to run our code|
 |processed-data-file|string|please use "./input/kaggleAdDisplayChallenge_processed.npz" to run our code|
@@ -67,7 +67,7 @@ command line arguments
 |round-targets|boolean|pleause use "True"|
 |learning-rate|double|our default learning rate is 0.1|
 |mini-batch-size|int|batch size|
-|nepochs|int|num of epochs|
+|nepochs|int|number of epochs|
 |print-freq|int|the frequency to print log|
 |print-time|-||
 |test-mini-batch-size|int|the batch size for test, please use 16384 to run our code| 
