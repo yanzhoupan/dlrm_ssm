@@ -32,6 +32,10 @@ cuda-dev(*optional*)
 
 tqdm
 
+### Prepare dataset
+Download the dataset from https://www.kaggle.com/c/criteo-display-ad-challenge and Put the train.txt file and test.txt file in /dlrm_ssm/input/
+
+
 ### Run SSM embeddings with DLRM:
 #### 1. Pre-training
 Use tricks/lsh_pp_pretraining.py to generate the min_hash_table for SSM embeddings. 3 hyperparameter is needed：
