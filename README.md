@@ -43,7 +43,7 @@ Use tricks/lsh_pp_pretraining.py to generate the min_hash_table for SSM embeddin
 |command line arguments|usage|
 |:--------------------|:----|
 |EMBEDDING|embedding dimension|
-|NUM_HASH| number of hash functions used to generate min_hash_table|
+|NUM_HASH|number of hash functions used to generate min_hash_table|
 |NUM_PT|number of datapoints used to represent the dataset|
 
 For example:  
@@ -65,19 +65,19 @@ command line arguments
 |rand-emb-compression-rate|float|1/expansion rate|
 |arch-sparse-feature-size|string|we use "13-512-256-128" which is the default value for DLRM|
 |arch-mlp-bot|string|we use "1024-1024-512-256-1" which is the default value for DLRM|
-|data-generation|string|"dataset" to run our code, default is "ramdom"|
-|data-set|string|please use "kaggle" to run our code|
-|raw-data-file|string|please use "./input/train.txt" to run our code|
-|processed-data-file|string|please use "./input/kaggleAdDisplayChallenge_processed.npz" to run our code|
+|data-generation|string|use "dataset" to run our code, default is "ramdom"|
+|data-set|string|use "kaggle" to run our code|
+|raw-data-file|string|please use "./input/train.txt"|
+|processed-data-file|string|please use "./input/kaggleAdDisplayChallenge_processed.npz"|
 |loss-function|string|please use "bce"|
 |round-targets|boolean|pleause use "True"|
-|learning-rate|double|our default learning rate is 0.1|
-|mini-batch-size|int|batch size|
-|nepochs|int|number of epochs|
+|learning-rate|double|default learning rate is 0.1|
+|mini-batch-size|int|the batch size is set to 2048 in our experiments|
+|nepochs|int|the number of epochs is set to 15 in our experiments|
 |print-freq|int|the frequency to print log|
 |print-time|-||
 |test-mini-batch-size|int|the batch size for test, please use 16384 to run our code| 
-|test-num-workers|int|we use 16 for our experiment|
+|test-num-workers|int|we use 16 for our experiments|
 
 
 #### A sample run of DLRM with SSM ebmedding code
