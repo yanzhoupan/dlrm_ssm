@@ -32,7 +32,7 @@ cuda-dev(*optional*)
 
 tqdm
 
-### Prepare dataset
+### Data preparation
 Download the dataset from https://www.kaggle.com/c/criteo-display-ad-challenge and Put the train.txt file and test.txt file in /dlrm_ssm/input/
 
 
