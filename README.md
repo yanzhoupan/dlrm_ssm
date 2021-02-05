@@ -1,4 +1,4 @@
-# Similarity-Based Shared Memory Embeddings for Recommendation Systems
+# Semantically Constrained Memory Allocation (SCMA) for Embedding inEfficient Recommendation Systems
 
 
 ## Description:
