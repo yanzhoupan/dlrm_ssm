@@ -18,8 +18,6 @@ torch.manual_seed(seed)
 # use partial data set to get minhash table.
 min_hash_gen = None
 val_indices = None
-#EMBEDDING = 256
-#NUM_HASH = 2
 
 import sys
 
