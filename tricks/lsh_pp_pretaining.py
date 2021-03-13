@@ -15,12 +15,18 @@ random.seed(seed)
 np.random.seed(seed)
 torch.manual_seed(seed)
 
+<<<<<<< HEAD
 
 # use partial data set to get minhash table.
 min_hash_gen = None
 val_indices = None
 #EMBEDDING = 256
 #NUM_HASH = 2
+=======
+# use partial data set to get minhash table.
+min_hash_gen = None
+val_indices = None
+>>>>>>> 02c9faad9c180ab406bbee4449a243c16d07007b
 
 import sys
 
@@ -48,7 +54,10 @@ def getBigMinHashTable():
     partial_cat_data = data['X_cat'][partial_idx]
     print(partial_cat_data.shape)
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> 02c9faad9c180ab406bbee4449a243c16d07007b
     start_time = time.time()
     np.savez(r'./cat_counts.npz', cat_counts = data['counts'])
 

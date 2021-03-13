@@ -85,9 +85,15 @@ from torch.nn.parallel.scatter_gather import gather, scatter
 from tricks.qr_embedding_bag import QREmbeddingBag
 # mixed-dimension trick
 from tricks.md_embedding_bag import PrEmbeddingBag, md_solver
+<<<<<<< HEAD
 from tricks.hash_embedding_bag import HashEmbeddingBag
 # from tricks.hash_embedding_bag_multi_update import HashEmbeddingBagMultiUpdate
 from tricks.hash_vector_embedding_bag import HashVectorEmbeddingBag, MultiUpdateHashVectorEmbeddingBag
+=======
+# from tricks.hash_embedding_bag import HashEmbeddingBag
+# from tricks.hash_embedding_bag_multi_update import HashEmbeddingBagMultiUpdate
+# from tricks.hash_vector_embedding_bag import HashVectorEmbeddingBag, MultiUpdateHashVectorEmbeddingBag
+>>>>>>> 02c9faad9c180ab406bbee4449a243c16d07007b
 import hashedEmbeddingBag
 from tricks.lsh_pretraining import getBigMinHashTable
 from tricks.lsh_embedding_bag import LshEmbeddingBag, LshEmbeddingBigBag
@@ -193,12 +199,21 @@ class DLRM_Net(nn.Module):
         emb_l = nn.ModuleList()
 
         if self.lsh_emb_flag:
+<<<<<<< HEAD
             # if not os.path.exists('./input/bigMinHashTable.npz') :
             #     print("Generating minhash table...")
             #     getBigMinHashTable(m, 2)
             counts = np.load('./input/cat_counts.npz')['cat_counts']
 
             min_hash_table = torch.as_tensor(np.load('./input/bigMinHashTable_H2_E32_P45840617.npz')['big_min_hash_table'])
+=======
+            if not os.path.exists('./input/bigMinHashTable.npz') :
+                print("Please generate the minhashTable...")
+                # getBigMinHashTable(m, 4)
+            counts = np.load('./input/cat_counts.npz')['cat_counts']
+
+            min_hash_table = torch.as_tensor(np.load('./input/bigMinHashTable_H2_E' + str(m) +'_P125000.npz')['big_min_hash_table'])
+>>>>>>> 02c9faad9c180ab406bbee4449a243c16d07007b
             min_hash_table = min_hash_table.cpu()
             print("Minhash table memory device: ", min_hash_table.device)
 
@@ -221,7 +236,10 @@ class DLRM_Net(nn.Module):
 
             elif self.rand_hash_emb_flag:
                 EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, self.rand_hash_compression_rate, "sum")
+<<<<<<< HEAD
                 # EE = HashVectorEmbeddingBag(n, m)
+=======
+>>>>>>> 02c9faad9c180ab406bbee4449a243c16d07007b
 
             elif self.lsh_emb_flag:
                 print("Generating lsh embedding, rate: ", self.lsh_emb_compression_rate)
