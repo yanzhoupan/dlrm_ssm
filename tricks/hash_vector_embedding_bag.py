@@ -61,7 +61,6 @@ class HashVectorEmbeddingBag(nn.Module):
         '''
         Hash matrix indices to an index in the compressed vector
         representation.
-
         Returns a vector of indices with size size_out,
         where the indices are in the range [0,hN).
         '''
@@ -156,7 +155,6 @@ class MultiUpdateHashVectorEmbeddingBag(nn.Module):
         '''
         Hash matrix indices to an index in the compressed vector
         representation.
-
         Returns a vector of indices with size size_out,
         where the indices are in the range [0,hN).
         '''

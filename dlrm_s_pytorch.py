@@ -86,7 +86,7 @@ from tricks.qr_embedding_bag import QREmbeddingBag
 # mixed-dimension trick
 from tricks.md_embedding_bag import PrEmbeddingBag, md_solver
 from tricks.hash_embedding_bag import HashEmbeddingBag
-from tricks.hash_embedding_bag_multi_update import HashEmbeddingBagMultiUpdate
+# from tricks.hash_embedding_bag_multi_update import HashEmbeddingBagMultiUpdate
 from tricks.hash_vector_embedding_bag import HashVectorEmbeddingBag, MultiUpdateHashVectorEmbeddingBag
 import hashedEmbeddingBag
 from tricks.lsh_pretraining import getBigMinHashTable
@@ -183,6 +183,7 @@ class DLRM_Net(nn.Module):
 
 
     def create_emb(self, m, ln):
+        # generate the big shared weight for SSM embedding
         if self.lsh_emb_flag:
                 self.hashed_weight = nn.Parameter(torch.from_numpy(np.random.uniform(
                         low=-np.sqrt(1 / max(ln)), high=np.sqrt(1 / max(ln)), size=((int(sum(ln) * m * self.lsh_emb_compression_rate),))
@@ -192,12 +193,12 @@ class DLRM_Net(nn.Module):
         emb_l = nn.ModuleList()
 
         if self.lsh_emb_flag:
-            if not os.path.exists('./input/bigMinHashTable.npz') :
-                print("Generating minhash table...")
-                getBigMinHashTable()
+            # if not os.path.exists('./input/bigMinHashTable.npz') :
+            #     print("Generating minhash table...")
+            #     getBigMinHashTable(m, 2)
             counts = np.load('./input/cat_counts.npz')['cat_counts']
 
-            min_hash_table = torch.as_tensor(np.load('./input/bigMinHashTable.npz')['big_min_hash_table'])
+            min_hash_table = torch.as_tensor(np.load('./input/bigMinHashTable_H2_E32_P45840617.npz')['big_min_hash_table'])
             min_hash_table = min_hash_table.cpu()
             print("Minhash table memory device: ", min_hash_table.device)
 
@@ -220,6 +221,7 @@ class DLRM_Net(nn.Module):
 
             elif self.rand_hash_emb_flag:
                 EE = hashedEmbeddingBag.HashedEmbeddingBag(n, m, self.rand_hash_compression_rate, "sum")
+                # EE = HashVectorEmbeddingBag(n, m)
 
             elif self.lsh_emb_flag:
                 print("Generating lsh embedding, rate: ", self.lsh_emb_compression_rate)
