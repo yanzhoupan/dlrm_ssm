@@ -38,6 +38,7 @@ Download the dataset from https://www.kaggle.com/c/criteo-display-ad-challenge a
 
 
 ### Run SCMA embeddings with DLRM:
+#### Note: This code provides a proof of concept of LMA-DLRM . It precomputes lsh based mapping and uses it in code. We are in process of releasing the efficient code where mapping is computed on the fly. 
 #### 1. Pre-training
 Use tricks/lsh_pp_pretraining.py to generate the min_hash_table for SCMA embeddings. 3 hyperparameter is needed：
 
