@@ -94,7 +94,9 @@ cuda-dev is a prerequest for our implementation of HashNet embeddings.
 ```
 python tricks/hashedEmbeddingBag/setup.py install
 ```
-will install the HashNet
+will install the HashNet. 
+
+We also have a saparate HashNet repo here: https://github.com/wanmeihuali/HashedEmbeddingBag
 
 #### 2. Run DLRM with HashNet embedding
 Use --rand-emb-flag in bench/dlrm_s_criteo_kaggle.sh to enbale HashNet embedding, use --rand-emb-compression-rate to set your expansion rate. Other settings can stay the same as SSM embedding.
